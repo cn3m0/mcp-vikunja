@@ -1,0 +1,4 @@
+interface:
+  display_name: "MCP Vikunja Deploy"
+  short_description: "Deploy and validate mcp-vikunja fast."
+  default_prompt: "Use $mcp-vikunja-deploy to bootstrap this repository, run checks, and register the MCP server in Codex."

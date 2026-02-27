@@ -190,16 +190,18 @@ Included in this repo:
 
 This repo includes a reusable skill for fast setup on other Codex instances:
 
-- `skills/vikunja-poc-deploy`
+- `skills/mcp-vikunja-deploy`
+
+Skills info is available in `skills/README.md`.
 
 Install locally:
 
 ```bash
 mkdir -p "$HOME/.codex/skills"
-cp -r skills/vikunja-poc-deploy "$HOME/.codex/skills/"
+cp -r skills/mcp-vikunja-deploy "$HOME/.codex/skills/"
 ```
 
-Invoke by skill name: `vikunja-poc-deploy`.
+Invoke by skill name: `mcp-vikunja-deploy`.
 
 ## Long-Term Vision
 
@@ -209,4 +211,3 @@ Invoke by skill name: `vikunja-poc-deploy`.
 - iterative execution loops
 - agent self-reflection on board state
 - structured AI-assisted engineering workflows
-

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Vikunja PoC Deploy"
-  short_description: "Deploy and validate Vikunja MCP PoC fast."
-  default_prompt: "Use $vikunja-poc-deploy to bootstrap this repository, run checks, and register the MCP server in Codex."

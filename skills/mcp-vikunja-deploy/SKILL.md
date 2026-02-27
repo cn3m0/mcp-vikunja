@@ -1,9 +1,9 @@
 ---
-name: vikunja-poc-deploy
-description: Bootstrap, verify, and connect the Vikunja + MCP PoC repository on a fresh Codex instance. Use when you need fast local setup, admin/token initialization, end-to-end verification, Codex MCP registration, or operational troubleshooting for this project.
+name: mcp-vikunja-deploy
+description: Bootstrap, verify, and connect the production-ready mcp-vikunja repository on a fresh Codex instance. Use when fast local setup, admin/token initialization, end-to-end verification, Codex MCP registration, or operational troubleshooting is required.
 ---
 
-# Vikunja PoC Deploy
+# MCP Vikunja Deploy
 
 ## Overview
 
