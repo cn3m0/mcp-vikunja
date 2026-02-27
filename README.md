@@ -53,6 +53,14 @@ Runtime services:
 - Reproducible via Docker Compose.
 - End-to-end validated for Vikunja API and MCP flows.
 
+## Project Documents
+
+- [Project Definition](./PROJECT.md)
+- [Execution Plan](./PLAN.md)
+- [Contribution Guide](./CONTRIBUTING.md)
+- [Skills Overview](./skills/README.md)
+- [Main Deploy Skill](./skills/mcp-vikunja-deploy/SKILL.md)
+
 ## Features
 
 ### Implemented MCP tools
