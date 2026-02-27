@@ -1,65 +1,76 @@
-# Vikunja + MCP PoC
+# Vikunja MCP Kanban Stack
 
-Lokaler Proof of Concept für:
+Production-ready self-hosted Kanban stack with MCP integration for Codex.
 
-- Vikunja (Self-hosted Kanban)
-- PostgreSQL
-- MCP-Adapter für Codex
+This project provides:
 
-## Voraussetzungen
+- Vikunja web app and API
+- PostgreSQL persistence
+- MCP adapter exposing Vikunja operations as MCP tools
+- Automated bootstrap and verification scripts
+- Make-based one-command onboarding
 
-- Docker + Docker Compose
+## Status
+
+- Ready for day-to-day project management use.
+- Fully reproducible with Docker Compose.
+- Validated end-to-end (Vikunja API + MCP tool flow).
+
+## Architecture
+
+- `db`: PostgreSQL 16 (`postgres:16-alpine`)
+- `vikunja`: `vikunja/vikunja:latest` on `http://localhost:3456`
+- `mcp-adapter`: Python FastMCP service on `http://localhost:8000/mcp`
+
+## Prerequisites
+
+- Docker
+- Docker Compose
 - Python 3.12+
 
-## Schnellstart
+## Quick Start
 
-1. `.env` erstellen:
-
-```bash
-cp .env.example .env
-```
-
-2. Stack starten:
-
-```bash
-docker compose up -d --build
-```
-
-3. Admin-User und API-Token erzeugen:
-
-```bash
-python3 scripts/bootstrap_admin_and_token.py
-```
-
-4. MCP-Adapter mit Token neu starten:
-
-```bash
-docker compose up -d --build mcp-adapter
-```
-
-5. PoC verifizieren:
-
-```bash
-python3 scripts/verify_poc.py
-```
-
-6. MCP-Transport direkt testen:
-
-```bash
-python3 scripts/test_mcp_adapter.py
-```
-
-### Alternativ mit Makefile
+Run everything in one command:
 
 ```bash
 make onboard
 ```
 
-`make onboard` führt `up + bootstrap + full-check` in einem Ablauf aus.
+`make onboard` runs:
 
-## MCP-Tools
+- `make up`
+- `make bootstrap`
+- `make full-check`
 
-Implementierte Tools im Adapter:
+## Manual Setup
+
+1. Create environment file:
+
+```bash
+cp .env.example .env
+```
+
+2. Start services:
+
+```bash
+make up
+```
+
+3. Create admin user and API token:
+
+```bash
+make bootstrap
+```
+
+4. Run runtime checks:
+
+```bash
+make full-check
+```
+
+## MCP Tools
+
+The adapter currently exposes:
 
 - `health`
 - `list_projects`
@@ -68,85 +79,79 @@ Implementierte Tools im Adapter:
 - `create_task`
 - `move_task`
 
-## Codex MCP-Anbindung
+## Codex Integration
 
-MCP-Server in Codex registrieren:
+Register the running MCP server in Codex:
 
 ```bash
 codex mcp add vikunja --url http://localhost:8000/mcp
+codex mcp get vikunja
 codex mcp list
 ```
 
-Details prüfen:
+Note: `/mcp` is a Streamable HTTP MCP endpoint. Browser GET requests are not a valid MCP protocol test.
 
-```bash
-codex mcp get vikunja
-```
+## Operations
 
-Hinweis: `http://localhost:8000/mcp` ist ein Streamable-HTTP-Endpunkt. Direkte Browser-GETs sind kein valider MCP-Test.
+Common commands:
 
-## GitHub Publish Readiness
+- `make help`
+- `make ps`
+- `make logs`
+- `make down`
+- `make clean`
 
-Vor dem Publish:
+Validation commands:
+
+- `make verify` (Vikunja workflow validation)
+- `make test-mcp` (MCP protocol + tool-call validation)
+- `make full-check` (both checks)
+- `make publish-check` (static publish checks)
+
+## Environment Variables
+
+Main values in `.env.example`:
+
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `VIKUNJA_JWT_SECRET`
+- `VIKUNJA_PUBLIC_URL`
+- `VIKUNJA_ENABLE_REGISTRATION`
+- `VIKUNJA_INTERNAL_URL`
+- `VIKUNJA_ADMIN_USERNAME`
+- `VIKUNJA_ADMIN_EMAIL`
+- `VIKUNJA_ADMIN_PASSWORD`
+- `VIKUNJA_API_TOKEN_TITLE`
+- `VIKUNJA_API_TOKEN`
+
+## GitHub Publishing
+
+Before publishing:
 
 ```bash
 make publish-check
 ```
 
-Repo enthält für GitHub:
+This repository includes:
 
-- CI Workflow: `.github/workflows/ci.yml`
+- CI workflow: `.github/workflows/ci.yml`
 - License: `LICENSE` (MIT)
-- Contribution Guide: `CONTRIBUTING.md`
-- Secrets-Schutz: `.env` ist in `.gitignore`
+- Contribution guide: `CONTRIBUTING.md`
+- Secret protection via `.gitignore` (`.env` is excluded)
 
-Optionaler schneller Ablauf:
+## Codex Skill for Fast Reuse
 
-```bash
-git add .
-git commit -m "Prepare release"
-git push origin main
-```
-
-## Skill für andere Codex-Instanzen
-
-Dieses Repo enthält ein Skill zum schnellen Setup:
+A reusable skill is included for other Codex instances:
 
 - `skills/vikunja-poc-deploy`
 
-Das Skill nutzen, wenn ein anderer Codex diese Umgebung in einem frischen Checkout schnell starten und validieren soll.
-
-Lokale Installation in eine andere Codex-Instanz:
+Install it into another Codex environment:
 
 ```bash
 mkdir -p "$HOME/.codex/skills"
 cp -r skills/vikunja-poc-deploy "$HOME/.codex/skills/"
 ```
 
-Danach kann die andere Instanz das Skill über den Namen `vikunja-poc-deploy` verwenden.
+Then invoke it by name: `vikunja-poc-deploy`.
 
-## Nützliche Befehle
-
-Logs:
-
-```bash
-docker compose logs -f vikunja mcp-adapter
-```
-
-Services stoppen:
-
-```bash
-docker compose down
-```
-
-Services inkl. Volumes entfernen:
-
-```bash
-docker compose down -v
-```
-
-## Sicherheit
-
-- API-Token ist in `.env` und `.gitignore` ausgeschlossen.
-- Keine Hardcoded Secrets im Code.
-- `VIKUNJA_ENABLE_REGISTRATION=false` ist Standard.

@@ -7,7 +7,7 @@ help:
 	@echo "  make up         - Start all services (build if needed)"
 	@echo "  make onboard    - One-command bootstrap + full runtime checks"
 	@echo "  make bootstrap  - Create/verify admin user and generate API token"
-	@echo "  make verify     - Run Vikunja PoC verification"
+	@echo "  make verify     - Run Vikunja workflow verification"
 	@echo "  make test-mcp   - Run MCP streamable-http smoke test"
 	@echo "  make full-check - Run verify and MCP smoke test"
 	@echo "  make publish-check - Run static checks for GitHub publishing"
