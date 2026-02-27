@@ -49,6 +49,15 @@ python3 scripts/verify_poc.py
 python3 scripts/test_mcp_adapter.py
 ```
 
+### Alternativ mit Makefile
+
+```bash
+make up
+make bootstrap
+make verify
+make test-mcp
+```
+
 ## MCP-Tools
 
 Implementierte Tools im Adapter:
