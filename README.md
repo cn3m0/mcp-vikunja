@@ -2,22 +2,27 @@
 
 Production-ready, self-hosted Vikunja + MCP stack for AI-driven project management.
 
+- [AI-Driven Project Management: Introducing MCP-Vikunja](https://www.cn3m0.com/proof/ai-driven-project-management-introducing-mcp-vikunja/ "AI-Driven Project Management: Introducing MCP-Vikunja")
+- [What is the Model Context Protocol (MCP)?](https://modelcontextprotocol.io/docs/getting-started/intro "What is the Model Context Protocol (MCP)?")
+- [What are skills?](https://agentskills.io/what-are-skills "What are skills?")
+- [Vikunja: The open-source, self-hostable to-do app](https://vikunja.io/ "Vikunja: The open-source, self-hostable to-do app")
+
 ## Overview
 
-`mcp-vikunja` connects [Vikunja](https://vikunja.io/) to MCP-compatible AI agents (for example Codex), so agents can manage project and task workflows directly via tool calls.
+`mcp-vikunja` connects [Vikunja](https://github.com/go-vikunja/vikunja "GitHub / Vikunja") to MCP-compatible AI agents (for example Codex), so agents can manage project and task workflows directly via tool calls.
 
 This repository provides:
 
 - Vikunja web app and REST API
-- PostgreSQL persistence
-- Python FastMCP adapter
+- [PostgreSQL](https://www.postgresql.org/) persistence
+- [Python FastMCP](https://pypi.org/project/fastmcp/) adapter
 - Bootstrap and verification scripts
 - Make-based one-command onboarding
 - GitHub publish readiness (CI + license + contribution guide)
 
 ## Why
 
-AI coding agents can generate code, but real engineering also needs:
+[AI coding agents](https://openai.com/codex/ "AI coding agents") can generate code, but real engineering also needs:
 
 - project structure
 - task lifecycle management
@@ -86,9 +91,9 @@ Runtime services:
 
 ## Prerequisites
 
-- Docker
-- Docker Compose
-- Python 3.12+
+- [Docker](https://www.docker.com)
+- [Docker Compose](https://docs.docker.com/compose/)
+- [Python](https://www.python.org/) 3.12+
 
 ## Quick Start
 
