@@ -1,0 +1,2 @@
+"""Vikunja MCP adapter package."""
+
