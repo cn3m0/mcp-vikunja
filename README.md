@@ -1,26 +1,76 @@
-# Vikunja MCP Kanban Stack
+# mcp-vikunja
 
-Production-ready self-hosted Kanban stack with MCP integration for Codex.
+Production-ready, self-hosted Vikunja + MCP stack for AI-driven project management.
 
-This project provides:
+## Overview
 
-- Vikunja web app and API
+`mcp-vikunja` connects [Vikunja](https://vikunja.io/) to MCP-compatible AI agents (for example Codex), so agents can manage project and task workflows directly via tool calls.
+
+This repository provides:
+
+- Vikunja web app and REST API
 - PostgreSQL persistence
-- MCP adapter exposing Vikunja operations as MCP tools
-- Automated bootstrap and verification scripts
+- Python FastMCP adapter
+- Bootstrap and verification scripts
 - Make-based one-command onboarding
+- GitHub publish readiness (CI + license + contribution guide)
 
-## Status
+## Why
 
-- Ready for day-to-day project management use.
-- Fully reproducible with Docker Compose.
-- Validated end-to-end (Vikunja API + MCP tool flow).
+AI coding agents can generate code, but real engineering also needs:
+
+- project structure
+- task lifecycle management
+- status transitions
+- execution loops with feedback
+
+With MCP integration, the agent can operate on actual project state instead of only text context.
 
 ## Architecture
 
-- `db`: PostgreSQL 16 (`postgres:16-alpine`)
+```text
+Codex / AI Agent
+        |
+        v
+MCP Adapter (this project)
+        |
+        v
+Vikunja API (REST)
+        |
+        v
+PostgreSQL
+```
+
+Runtime services:
+
+- `db`: `postgres:16-alpine`
 - `vikunja`: `vikunja/vikunja:latest` on `http://localhost:3456`
-- `mcp-adapter`: Python FastMCP service on `http://localhost:8000/mcp`
+- `mcp-adapter`: FastMCP service on `http://localhost:8000/mcp`
+
+## Status
+
+- Ready for day-to-day use.
+- Reproducible via Docker Compose.
+- End-to-end validated for Vikunja API and MCP flows.
+
+## Features
+
+### Implemented MCP tools
+
+- `health`
+- `list_projects`
+- `create_project`
+- `list_tasks`
+- `create_task`
+- `move_task`
+
+### Design principles
+
+- minimal dependencies
+- deterministic behavior
+- environment-based configuration
+- no hardcoded credentials
+- fully self-hostable
 
 ## Prerequisites
 
@@ -30,7 +80,7 @@ This project provides:
 
 ## Quick Start
 
-Run everything in one command:
+One command:
 
 ```bash
 make onboard
@@ -44,7 +94,7 @@ make onboard
 
 ## Manual Setup
 
-1. Create environment file:
+1. Create `.env`:
 
 ```bash
 cp .env.example .env
@@ -56,7 +106,7 @@ cp .env.example .env
 make up
 ```
 
-3. Create admin user and API token:
+3. Create/verify admin user and API token:
 
 ```bash
 make bootstrap
@@ -68,20 +118,9 @@ make bootstrap
 make full-check
 ```
 
-## MCP Tools
-
-The adapter currently exposes:
-
-- `health`
-- `list_projects`
-- `create_project`
-- `list_tasks`
-- `create_task`
-- `move_task`
-
 ## Codex Integration
 
-Register the running MCP server in Codex:
+Register the MCP server in Codex:
 
 ```bash
 codex mcp add vikunja --url http://localhost:8000/mcp
@@ -101,16 +140,16 @@ Common commands:
 - `make down`
 - `make clean`
 
-Validation commands:
+Validation:
 
 - `make verify` (Vikunja workflow validation)
 - `make test-mcp` (MCP protocol + tool-call validation)
-- `make full-check` (both checks)
+- `make full-check` (verify + test-mcp)
 - `make publish-check` (static publish checks)
 
 ## Environment Variables
 
-Main values in `.env.example`:
+Main variables in `.env.example`:
 
 - `POSTGRES_DB`
 - `POSTGRES_USER`
@@ -125,6 +164,13 @@ Main values in `.env.example`:
 - `VIKUNJA_API_TOKEN_TITLE`
 - `VIKUNJA_API_TOKEN`
 
+## Security
+
+- Keep token/secrets in `.env` only.
+- Never commit `.env` or runtime tokens.
+- Registration is disabled by default (`VIKUNJA_ENABLE_REGISTRATION=false`).
+- Use a reverse proxy and HTTPS for public exposure.
+
 ## GitHub Publishing
 
 Before publishing:
@@ -133,25 +179,34 @@ Before publishing:
 make publish-check
 ```
 
-This repository includes:
+Included in this repo:
 
 - CI workflow: `.github/workflows/ci.yml`
 - License: `LICENSE` (MIT)
 - Contribution guide: `CONTRIBUTING.md`
-- Secret protection via `.gitignore` (`.env` is excluded)
+- Secret protection: `.env` is ignored via `.gitignore`
 
-## Codex Skill for Fast Reuse
+## Reusable Codex Skill
 
-A reusable skill is included for other Codex instances:
+This repo includes a reusable skill for fast setup on other Codex instances:
 
 - `skills/vikunja-poc-deploy`
 
-Install it into another Codex environment:
+Install locally:
 
 ```bash
 mkdir -p "$HOME/.codex/skills"
 cp -r skills/vikunja-poc-deploy "$HOME/.codex/skills/"
 ```
 
-Then invoke it by name: `vikunja-poc-deploy`.
+Invoke by skill name: `vikunja-poc-deploy`.
+
+## Long-Term Vision
+
+`mcp-vikunja` is a foundation for AI-native project orchestration:
+
+- autonomous task planning
+- iterative execution loops
+- agent self-reflection on board state
+- structured AI-assisted engineering workflows
 
