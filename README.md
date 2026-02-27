@@ -43,6 +43,12 @@ docker compose up -d --build mcp-adapter
 python3 scripts/verify_poc.py
 ```
 
+6. MCP-Transport direkt testen:
+
+```bash
+python3 scripts/test_mcp_adapter.py
+```
+
 ## MCP-Tools
 
 Implementierte Tools im Adapter:
@@ -53,6 +59,23 @@ Implementierte Tools im Adapter:
 - `list_tasks`
 - `create_task`
 - `move_task`
+
+## Codex MCP-Anbindung
+
+MCP-Server in Codex registrieren:
+
+```bash
+codex mcp add vikunja --url http://localhost:8000/mcp
+codex mcp list
+```
+
+Details prüfen:
+
+```bash
+codex mcp get vikunja
+```
+
+Hinweis: `http://localhost:8000/mcp` ist ein Streamable-HTTP-Endpunkt. Direkte Browser-GETs sind kein valider MCP-Test.
 
 ## Nützliche Befehle
 
@@ -79,4 +102,3 @@ docker compose down -v
 - API-Token ist in `.env` und `.gitignore` ausgeschlossen.
 - Keine Hardcoded Secrets im Code.
 - `VIKUNJA_ENABLE_REGISTRATION=false` ist Standard.
-
