@@ -20,20 +20,26 @@ python3 --version
 make help
 ```
 
-2. Start and bootstrap the stack.
+2. Start, bootstrap, and verify in one command when possible.
+
+```bash
+make onboard
+```
+
+3. Use split commands only for debugging.
 
 ```bash
 make up
 make bootstrap
 ```
 
-3. Run runtime checks.
+4. Run runtime checks.
 
 ```bash
 make full-check
 ```
 
-4. Register MCP server in Codex.
+5. Register MCP server in Codex.
 
 ```bash
 codex mcp add vikunja --url http://localhost:8000/mcp
@@ -69,4 +75,3 @@ docker compose up -d --build mcp-adapter
 
 - Use command matrix:
   See `references/command-matrix.md`.
-

@@ -2,6 +2,7 @@
 
 ## Setup
 
+- `make onboard`: One-command setup (`up` + `bootstrap` + `full-check`).
 - `make up`: Start all containers and build images.
 - `make bootstrap`: Create/verify admin user, generate API token, restart adapter.
 
@@ -24,4 +25,3 @@
 - `codex mcp add vikunja --url http://localhost:8000/mcp`
 - `codex mcp get vikunja`
 - `codex mcp list`
-

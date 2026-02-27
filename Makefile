@@ -1,10 +1,11 @@
 SHELL := /bin/bash
 
-.PHONY: help up bootstrap verify test-mcp full-check publish-check logs ps down clean
+.PHONY: help onboard up bootstrap verify test-mcp full-check publish-check logs ps down clean
 
 help:
 	@echo "Available targets:"
 	@echo "  make up         - Start all services (build if needed)"
+	@echo "  make onboard    - One-command bootstrap + full runtime checks"
 	@echo "  make bootstrap  - Create/verify admin user and generate API token"
 	@echo "  make verify     - Run Vikunja PoC verification"
 	@echo "  make test-mcp   - Run MCP streamable-http smoke test"
@@ -18,6 +19,8 @@ help:
 up:
 	@if [ ! -f .env ]; then cp .env.example .env; echo "Created .env from .env.example"; fi
 	docker compose up -d --build
+
+onboard: up bootstrap full-check
 
 bootstrap:
 	python3 scripts/bootstrap_admin_and_token.py

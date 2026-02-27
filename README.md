@@ -52,10 +52,10 @@ python3 scripts/test_mcp_adapter.py
 ### Alternativ mit Makefile
 
 ```bash
-make up
-make bootstrap
-make full-check
+make onboard
 ```
+
+`make onboard` führt `up + bootstrap + full-check` in einem Ablauf aus.
 
 ## MCP-Tools
 
