@@ -1,240 +1,241 @@
 # PLAN.md
 
-## Dokumentstatus
+## Document Status
 
-- Erstellt am: 2026-02-27
-- Letzte Aktualisierung: 2026-02-27
-- Quelle: `PROJECT.md`
-- Zweck: Ausgangslage dokumentieren und entscheidungsfertigen Umsetzungsplan bereitstellen
+- Created on: 2026-02-27
+- Last updated: 2026-02-27
+- Source: `PROJECT.md`
+- Purpose: capture baseline and provide an implementation plan with execution status
 
-## 0. Ausgangspunkt (Baseline aus PROJECT.md)
+## 0. Baseline (from PROJECT.md)
 
-- Ziel: Self-hosted Kanban mit AI-Integration (Codex) als PoC.
-- Zielsystem:
-- Vikunja (Kanban)
-- PostgreSQL (Persistenz)
-- MCP-Server (Model Context Protocol Adapter)
-- Lokale Codex-Integration
-- Betriebsmodell: lokal via Docker Compose.
-- Gewünschte Fähigkeiten für Codex:
-- Boards lesen
-- Tasks erstellen
-- Tasks verschieben
-- Status auswerten
-- Zusammenfassungen generieren
-- Startstatus:
-- Anforderungen sind definiert.
-- Umsetzung ist noch nicht begonnen.
+- Goal: self-hosted Kanban with AI integration (Codex), delivered as `mcp-vikunja`.
+- Target system:
+  - Vikunja (Kanban)
+  - PostgreSQL (persistence)
+  - MCP server (Model Context Protocol adapter)
+  - local Codex integration
+- Operating model: local Docker Compose.
+- Target Codex capabilities:
+  - read board state
+  - create tasks
+  - move tasks
+  - evaluate status
+  - generate summaries
+- Initial status:
+  - requirements defined
+  - implementation planned
 
-## 1. Ziel und Scope
+## 1. Goal and Scope
 
-### In Scope
+### In scope
 
-- Docker-Compose-Setup mit `postgres:16-alpine` und `vikunja/vikunja:latest`
-- Konfiguration über `.env` (DB, JWT Secret, Public URL, Token)
-- Initialisierung mit Admin-User und API-Token
-- Lokaler MCP-Adapter mit den vereinbarten Tools
-- Verifikation der Kern-Use-Cases Ende-zu-Ende
+- Docker Compose stack with `postgres:16-alpine` and `vikunja/vikunja:latest`
+- `.env`-based configuration (DB, JWT secret, public URL, token)
+- initialization flow with admin user and API token
+- local MCP adapter with defined tool contracts
+- end-to-end verification of core use cases
 
-### Out of Scope (vorerst)
+### Out of scope (initially)
 
-- Nginx Reverse Proxy
+- Nginx reverse proxy
 - HTTPS via Let's Encrypt
-- OAuth Integration
-- Webhook-Automatisierung
-- Task Digest Generator als separates Produktfeature
+- OAuth integration
+- webhook automation
+- task digest generator as separate product feature
 
-## 2. Architektur und Komponenten
+## 2. Architecture and Components
 
-### Komponenten
+### Components
 
 - PostgreSQL:
-- Persistente Speicherung aller Vikunja-Daten
-- Healthcheck muss aktiv sein
-- Vikunja Backend/API:
-- Zugriff für UI und MCP-Adapter
-- Authentifizierung via Bearer-Token
-- Vikunja Web UI:
-- Manuelle Sichtprüfung und Betriebsoberfläche
-- MCP-Adapter-Service:
-- Kapselt Vikunja-API als MCP-Tools
-- Minimales, nachvollziehbares Logging
+  - persistent storage for Vikunja data
+  - healthcheck required
+- Vikunja backend/API:
+  - API for UI and MCP adapter
+  - Bearer token authentication
+- Vikunja web UI:
+  - operational interface and manual validation
+- MCP adapter service:
+  - wraps Vikunja API as MCP tools
+  - minimal, traceable logging
 - Codex:
-- Nutzt MCP-Tools für Lese-/Schreibzugriffe und Zusammenfassungen
+  - consumes MCP tools for read/write operations and summaries
 
-### Netzwerk und Erreichbarkeit
+### Network and Reachability
 
-- Alle Container im selben Docker-Netz
-- UI/API erreichbar unter `http://localhost:3456`
-- MCP-Service greift intern über Docker-Netz auf Vikunja zu
+- all containers share one Docker network
+- UI/API reachable at `http://localhost:3456`
+- MCP adapter reaches Vikunja via Docker internal network
 
-## 3. Umsetzungsphasen mit Deliverables
+## 3. Implementation Phases and Deliverables
 
-### Phase 1: Infrastruktur
+### Phase 1: Infrastructure
 
-- Aufgaben:
-- Docker Compose definieren
-- PostgreSQL und Vikunja anbinden
-- Persistente Volumes konfigurieren
-- Restart-Policies setzen
-- DB-Healthcheck erzwingen
+- Tasks:
+  - define Docker Compose
+  - connect PostgreSQL and Vikunja
+  - configure persistent volumes
+  - set restart policies
+  - enforce DB healthcheck
 - Deliverables:
-- `docker-compose.yml`
-- `.env.example` oder dokumentierte `.env`-Variablen
-- Akzeptanzkriterien:
-- `docker compose up` startet ohne Konfigurationsfehler
-- PostgreSQL wird als healthy gemeldet
-- Vikunja verbindet sich mit DB
+  - `docker-compose.yml`
+  - `.env.example` (or equivalent documented env variables)
+- Acceptance criteria:
+  - `docker compose up` starts without configuration errors
+  - PostgreSQL reports healthy
+  - Vikunja connects to DB successfully
 
-### Phase 2: Initialisierung
+### Phase 2: Initialization
 
-- Aufgaben:
-- Dienste starten und auf Port `3456` prüfen
-- Admin-User anlegen
-- API-Token erzeugen
-- Token-Handling dokumentieren (nur ENV)
+- Tasks:
+  - start services and verify port `3456`
+  - create admin user
+  - generate API token
+  - document token handling via env only
 - Deliverables:
-- Initialisierungsanleitung im Repo
-- Definierte ENV-Variable für Token
-- Akzeptanzkriterien:
-- Login mit Admin möglich
-- API-Aufruf mit Token funktioniert
+  - initialization instructions/scripts in repo
+  - defined env variable for token
+- Acceptance criteria:
+  - admin login works
+  - token-authenticated API request works
 
-### Phase 3: MCP-Adapter
+### Phase 3: MCP Adapter
 
-- Aufgaben:
-- Lokalen MCP-Service anlegen
-- Tools implementieren: `health`, `list_projects`, `create_project`, `list_tasks`, `create_task`, `move_task`
-- Robuste Fehlerbehandlung umsetzen
-- Minimales Logging einbauen
+- Tasks:
+  - create local MCP service
+  - implement tools: `health`, `list_projects`, `create_project`, `list_tasks`, `create_task`, `move_task`
+  - implement robust error handling
+  - add minimal structured logging
 - Deliverables:
-- MCP-Service-Code
-- Tool-Definitionen und Startanleitung
-- Akzeptanzkriterien:
-- Alle Tools antworten in konsistenter Struktur
-- Fehlerfälle liefern aussagekräftige Fehlercodes
+  - MCP service implementation
+  - tool definitions and run instructions
+- Acceptance criteria:
+  - all tools respond with consistent structure
+  - error paths provide clear error codes/messages
 
-### Phase 4: Verifikation
+### Phase 4: Verification
 
-- Aufgaben:
-- Automatisierte oder skriptbasierte End-to-End-Prüfung ausführen
-- Ergebnisse dokumentieren
+- Tasks:
+  - run automated/scripted end-to-end checks
+  - document verification results
 - Deliverables:
-- Verifikationsskript oder reproduzierbare Testbefehle
-- Testprotokoll
-- Akzeptanzkriterien:
-- API erreichbar
-- Projekt erstellbar
-- Task erstellbar
-- Task verschiebbar
+  - verification script(s) or reproducible command set
+  - test protocol/log
+- Acceptance criteria:
+  - API reachable
+  - project creation works
+  - task creation works
+  - task move works
 
-## 4. Öffentliche Schnittstellen (MCP Tools/API)
+## 4. Public Interfaces (MCP Tools/API)
 
-### Gemeinsame Antwortstruktur
+### Common Response Contract
 
-- Erfolg:
-- `success: true`
-- `data: object`
-- Fehler:
-- `success: false`
-- `error.code: string`
-- `error.message: string`
-- `error.details: object|null`
+- Success:
+  - `success: true`
+  - `data: object`
+- Error:
+  - `success: false`
+  - `error.code: string`
+  - `error.message: string`
+  - `error.details: object|null`
 
-### Tool-Verträge
+### Tool Contracts
 
 - `health`
-- Input: keiner
-- Output: API-Erreichbarkeit, Service-Status
+  - Input: none
+  - Output: API reachability and service status
 - `list_projects`
-- Input: optional `limit`, `page`
-- Output: Liste mit `id`, `title`, `description`
+  - Input: optional `page`, `per_page`
+  - Output: list with `id`, `title`, `description`
 - `create_project`
-- Input: `title` (pflicht), `description` (optional)
-- Output: erzeugtes Projekt mit `id`
+  - Input: `title` (required), `description` (optional)
+  - Output: created project with `id`
 - `list_tasks`
-- Input: `project_id` (pflicht), optional `bucket_id`, `limit`, `page`
-- Output: Liste mit `id`, `title`, `status/bucket`, `project_id`
+  - Input: `project_id` (required), optional `view_id`, `page`, `per_page`
+  - Output: list with `id`, `title`, `bucket/status`, `project_id`
 - `create_task`
-- Input: `project_id` (pflicht), `title` (pflicht), `description` (optional), `bucket_id` (optional)
-- Output: erzeugter Task mit `id`
+  - Input: `project_id` (required), `title` (required), `description` (optional), `bucket_id` (optional)
+  - Output: created task with `id`
 - `move_task`
-- Input: `task_id` (pflicht), `target_bucket_id` (pflicht)
-- Output: aktualisierter Task inkl. neuem Bucket
+  - Input: `task_id` (required), `target_bucket_id` (required), optional `project_id`, `view_id`
+  - Output: updated task bucket assignment
 
-## 5. Verifikation und Testfälle
+## 5. Verification and Test Cases
 
-### Kernszenarien
+### Core scenarios
 
-- API Reachability:
-- Erwartung: `health` meldet `success: true`
-- Projekterstellung:
-- Aktion: `create_project` mit Name `CN3M0 PoC`
-- Erwartung: Projekt-ID wird zurückgegeben
-- Task-Erstellung:
-- Aktion: `create_task` im Projekt `CN3M0 PoC`
-- Erwartung: Task-ID wird zurückgegeben
-- Task-Verschiebung:
-- Aktion: `move_task` in andere Kanban-Spalte
-- Erwartung: Bucket/Status ist aktualisiert
-- Zusammenfassung:
-- Aktion: Boarddaten über MCP lesen und Statuszusammenfassung erzeugen
-- Erwartung: konsistente, nachvollziehbare Zusammenfassung
+- API reachability:
+  - Expectation: `health` returns `success: true`
+- Project creation:
+  - Action: `create_project` with title `CN3M0 PoC`
+  - Expectation: project ID returned
+- Task creation:
+  - Action: `create_task` in project `CN3M0 PoC`
+  - Expectation: task ID returned
+- Task move:
+  - Action: `move_task` to another Kanban bucket
+  - Expectation: bucket/status updated
+- Summary:
+  - Action: read board data via MCP and generate board summary
+  - Expectation: consistent, traceable summary output
 
-### Negative Tests
+### Negative tests
 
-- Ungültiger Token
-- Erwartung: Auth-Fehler mit klarer Meldung
-- Fehlende Pflichtfelder
-- Erwartung: Validierungsfehler mit klarer Feldangabe
-- Nicht existierende IDs
-- Erwartung: 404-nahe Fehlerabbildung im Tool-Fehlerobjekt
+- Invalid token:
+  - Expectation: authentication error with clear message
+- Missing required fields:
+  - Expectation: validation error with field-level detail
+- Non-existing IDs:
+  - Expectation: 404-like mapping in tool error object
 
-## 6. Sicherheits- und Betriebsanforderungen
+## 6. Security and Operational Requirements
 
-- API-Token niemals im Code hardcoden
-- Secrets nur über ENV-Variablen
-- Registrierung in produktionsnahem Betrieb deaktivieren
-- Keine öffentliche Exponierung ohne Reverse Proxy
-- Reproduzierbarkeit sicherstellen: Start über `docker compose up`
+- never hardcode API token in source code
+- keep secrets in environment variables
+- disable registration in production-like mode
+- no public exposure without reverse proxy
+- ensure reproducibility via `docker compose up`
 
-## 7. Risiken, Annahmen, offene Punkte
+## 7. Risks, Assumptions, Open Points
 
-### Annahmen
+### Assumptions
 
-- Docker und Docker Compose sind lokal verfügbar
-- Port `3456` ist frei
-- Vikunja-Image `latest` ist für PoC akzeptabel
+- Docker and Docker Compose are available locally
+- port `3456` is available
+- using `vikunja/vikunja:latest` is acceptable for this deployment
 
 ### Defaults
 
-- Sprache und Dokumentation in Deutsch
-- MCP-Implementierung darf Node oder Python sein
-- Entscheidung Node/Python erfolgt erst bei Implementierung
+- documentation language: English
+- MCP implementation language: Python (implemented)
+- local-first operation model
 
-### Risiken
+### Risks
 
-- Breaking Changes bei `vikunja/vikunja:latest`
-- Unklare Fehlerabbildung ohne einheitliches Fehlerschema
-- Token-Leakage bei unvorsichtigem Logging
+- potential breaking changes from `vikunja/vikunja:latest`
+- inconsistent error mapping without strict response contracts
+- accidental token leakage via careless logging
 
 ## 8. Definition of Done
 
-- [x] `docker compose up` startet alle Kernservices vollständig
-- [x] Admin-User ist angelegt und nutzbar
-- [x] API-Token ist erzeugt und ausschließlich via ENV konfiguriert
-- [x] Projekt `CN3M0 PoC` kann angelegt werden
-- [x] Task kann via MCP erzeugt werden
-- [x] Task kann via MCP zwischen Spalten verschoben werden
-- [x] Codex kann den Board-Zustand zusammenfassen
-- [x] Reproduzierbare Verifikation ist dokumentiert
+- [x] `docker compose up` starts all core services
+- [x] admin user is created and usable
+- [x] API token is generated and configured via env only
+- [x] project `CN3M0 PoC` can be created
+- [x] task can be created via MCP
+- [x] task can be moved between Kanban columns via MCP
+- [x] Codex can summarize board state
+- [x] reproducible verification is documented
 
-## 9. Start-zu-Ist Tracking (Checkliste)
+## 9. Baseline-to-Current Tracking
 
-| Bereich | Startstatus (2026-02-27) | Aktueller Status | Nachweis |
+| Area | Baseline (2026-02-27) | Current Status | Evidence |
 |---|---|---|---|
-| Infrastruktur (Compose, DB, Vikunja) | Geplant | DONE | docker compose + Healthchecks aktiv |
-| Initialisierung (Admin, Token) | Geplant | DONE | `scripts/bootstrap_admin_and_token.py` |
-| MCP-Adapter (Tools) | Geplant | DONE | `mcp_adapter/vikunja_mcp/server.py` |
-| Verifikation (E2E) | Geplant | DONE | `scripts/verify_poc.py` erfolgreich |
-| Sicherheit/Secrets | Anforderungen definiert | DONE | Token nur in `.env`, `.gitignore` aktiv |
+| Infrastructure (Compose, DB, Vikunja) | Planned | DONE | docker compose + healthchecks active |
+| Initialization (admin, token) | Planned | DONE | `scripts/bootstrap_admin_and_token.py` |
+| MCP adapter (tools) | Planned | DONE | `mcp_adapter/vikunja_mcp/server.py` |
+| Verification (E2E) | Planned | DONE | `scripts/verify_poc.py` successful |
+| Security/secrets | Requirements defined | DONE | token only in `.env`, `.gitignore` active |
+

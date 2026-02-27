@@ -1,187 +1,178 @@
 # PROJECT.md
 
-## Vikunja + MCP Proof of Concept
+## mcp-vikunja
 
-### Ziel: Self-hosted Kanban mit AI-Integration (Codex)
-
----
-
-## 1. Projektziel
-
-Dieses Projekt soll eine lokal gehostete Kanban-Infrastruktur aufbauen, bestehend aus:
-
-* Vikunja (Self-hosted Kanban-System)
-* PostgreSQL Datenbank
-* MCP-Server (Model Context Protocol Adapter)
-* API-Integration für Codex
-
-Ziel ist es, dass Codex:
-
-* Boards lesen kann
-* Tasks erstellen kann
-* Tasks verschieben kann
-* Status auswerten kann
-* Zusammenfassungen generieren kann
-
-Die gesamte Umgebung soll lokal via Docker Compose betrieben werden.
+### Goal: Self-hosted Kanban with AI integration (Codex)
 
 ---
 
-## 2. Architekturübersicht
+## 1. Project Objective
 
-Systemkomponenten:
+This project provides a locally hosted Kanban infrastructure consisting of:
 
-1. PostgreSQL (Persistenz)
-2. Vikunja Backend
-3. Vikunja Web UI
-4. MCP-Adapter-Service (Node oder Python)
-5. Lokale Codex-Integration
+- Vikunja (self-hosted Kanban system)
+- PostgreSQL database
+- MCP server (Model Context Protocol adapter)
+- Codex API integration
 
-Netzwerk:
+Target capabilities for Codex:
 
-* Alle Container im selben Docker-Netz
-* Vikunja erreichbar unter [http://localhost:3456](http://localhost:3456)
-* MCP-Service greift über internes Docker-Netz auf Vikunja zu
+- read board state
+- create tasks
+- move tasks
+- evaluate status
+- generate summaries
 
----
-
-## 3. Anforderungen
-
-### Funktional
-
-* Vikunja startet fehlerfrei
-* Admin-User existiert
-* API-Token kann erzeugt werden
-* MCP kann:
-
-  * Projekte listen
-  * Tasks listen
-  * Tasks erstellen
-  * Tasks verschieben
-
-### Nicht-Funktional
-
-* Kein Cloud-Zwang
-* Keine externen Abhängigkeiten
-* Reproduzierbar via `docker compose up`
-* Konfiguration via `.env`
+The entire environment runs locally via Docker Compose.
 
 ---
 
-## 4. Implementierungsaufgaben (für Codex)
+## 2. Architecture Overview
 
-### Phase 1 – Infrastruktur
+System components:
 
-1. Erstelle Docker Compose Setup:
+1. PostgreSQL (persistence)
+2. Vikunja backend
+3. Vikunja web UI
+4. MCP adapter service (Node or Python)
+5. Local Codex integration
 
-   * postgres:16-alpine
-   * vikunja/vikunja:latest
-2. Konfiguriere ENV:
+Network model:
 
-   * DB Credentials
-   * JWT Secret
-   * Public URL
-3. Stelle sicher:
-
-   * DB Healthcheck aktiv
-   * Restart Policy gesetzt
-   * Volumes persistent
-
-### Phase 2 – Initialisierung
-
-1. Starte Container
-2. Prüfe:
-
-   * Port 3456 erreichbar
-3. Erstelle Admin User
-4. Generiere API Token
-5. Dokumentiere Token Handling (ENV Variable)
-
-### Phase 3 – MCP Adapter
-
-1. Erstelle lokalen MCP-Service
-2. Implementiere folgende Tools:
-
-* health
-* list_projects
-* create_project
-* list_tasks
-* create_task
-* move_task
-
-3. API Auth via Bearer Token
-4. Fehlerbehandlung robust implementieren
-5. Logging minimal aber nachvollziehbar
-
-### Phase 4 – Verifikation
-
-Codex soll automatisiert prüfen:
-
-* Ist Vikunja API erreichbar?
-* Kann Projekt erzeugt werden?
-* Kann Task erzeugt werden?
-* Kann Task verschoben werden?
-
-Wenn alle Tests erfolgreich:
-→ PoC erfolgreich.
+- all containers run in the same Docker network
+- Vikunja is reachable at `http://localhost:3456`
+- MCP accesses Vikunja through the internal Docker network
 
 ---
 
-## 5. Sicherheitsanforderungen
+## 3. Requirements
 
-* API Token niemals hardcoded
-* Nutzung von ENV Variablen
-* Kein offenes Registration Flag im Produktivmodus
-* Keine Public Exposure ohne Reverse Proxy
+### Functional
+
+- Vikunja starts without errors
+- admin user exists
+- API token can be generated
+- MCP can:
+  - list projects
+  - list tasks
+  - create tasks
+  - move tasks
+
+### Non-functional
+
+- no cloud dependency required
+- no unnecessary external dependencies
+- reproducible startup via `docker compose up`
+- configuration via `.env`
 
 ---
 
-## 6. Erweiterung (optional)
+## 4. Implementation Tasks (for Codex)
 
-* Nginx Reverse Proxy
-* HTTPS via Let’s Encrypt
-* OAuth Integration
-* Webhook für AI Automatisierung
-* Task Digest Generator
+### Phase 1 - Infrastructure
+
+1. Create Docker Compose setup:
+   - `postgres:16-alpine`
+   - `vikunja/vikunja:latest`
+2. Configure environment values:
+   - DB credentials
+   - JWT secret
+   - public URL
+3. Ensure:
+   - DB healthcheck enabled
+   - restart policies configured
+   - persistent volumes configured
+
+### Phase 2 - Initialization
+
+1. Start containers
+2. Verify:
+   - port `3456` is reachable
+3. Create admin user
+4. Generate API token
+5. Document token handling via environment variable
+
+### Phase 3 - MCP Adapter
+
+1. Create local MCP service
+2. Implement tools:
+   - `health`
+   - `list_projects`
+   - `create_project`
+   - `list_tasks`
+   - `create_task`
+   - `move_task`
+3. API auth via Bearer token
+4. Implement robust error handling
+5. Keep logging minimal but traceable
+
+### Phase 4 - Verification
+
+Codex should validate automatically:
+
+- Is the Vikunja API reachable?
+- Can a project be created?
+- Can a task be created?
+- Can a task be moved?
+
+If all checks pass, the implementation is successful.
 
 ---
 
-## 7. Erfolgsdefinition
+## 5. Security Requirements
 
-Das Projekt gilt als erfolgreich, wenn:
+- never hardcode API tokens
+- use environment variables for secrets
+- disable open registration in production-like operation
+- do not expose services publicly without reverse proxy
 
-* `docker compose up` startet das System vollständig
-* Ein Projekt namens "CN3M0 PoC" kann erstellt werden
-* Ein Task kann via MCP erzeugt werden
-* Der Task kann zwischen Kanban-Spalten verschoben werden
-* Codex kann Board-Zustand zusammenfassen
+---
+
+## 6. Optional Extensions
+
+- Nginx reverse proxy
+- HTTPS via Let's Encrypt
+- OAuth integration
+- webhook-based AI automation
+- task digest generator
+
+---
+
+## 7. Success Criteria
+
+The project is considered successful when:
+
+- `docker compose up` starts the full system
+- a project named `CN3M0 PoC` can be created
+- a task can be created via MCP
+- the task can be moved between Kanban columns
+- Codex can summarize board state
 
 ---
 
 ## 8. Motivation
 
-Dieses Setup dient als:
+This setup is intended as:
 
-* AI-augmentiertes Projektmanagement-System
-* Experimentelle Infrastruktur für CN3M0
-* Grundlage für autonome Task-Orchestrierung
+- AI-augmented project management system
+- experimental infrastructure for CN3M0
+- foundation for autonomous task orchestration
 
 ---
 
-## 9. Arbeitsweise
+## 9. Working Style
 
-Codex darf:
+Codex may:
 
-* Dateien anlegen
-* Compose anpassen
-* MCP Code generieren
-* Testscripte schreiben
-* Logs auswerten
+- create files
+- update Compose configuration
+- generate MCP code
+- write test scripts
+- analyze logs
 
-Codex soll:
+Codex should:
 
-* deterministisch arbeiten
-* keine unnötigen Abhängigkeiten einführen
-* System minimal halten
-
+- work deterministically
+- avoid unnecessary dependencies
+- keep the system minimal
 
