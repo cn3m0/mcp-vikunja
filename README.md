@@ -58,6 +58,10 @@ Runtime services:
 - [Project Definition](./PROJECT.md)
 - [Execution Plan](./PLAN.md)
 - [Contribution Guide](./CONTRIBUTING.md)
+- [Code of Conduct](./CODE_OF_CONDUCT.md)
+- [Open Source Respect Guidelines (EN)](./OPEN_SOURCE_OF_CONDUCT.md)
+- [Open Source Respect Guidelines (DE)](./OPEN_SOURCE_OF_CONDUCT.de.md)
+- [Open Source Respect - Public Short Version](./OPEN_SOURCE_OF_CONDUCT_PUBLIC.md)
 - [Skills Overview](./skills/README.md)
 - [Main Deploy Skill](./skills/mcp-vikunja-deploy/SKILL.md)
 
