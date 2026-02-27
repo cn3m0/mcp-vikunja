@@ -220,22 +220,21 @@
 
 ## 8. Definition of Done
 
-- [ ] `docker compose up` startet alle Kernservices vollständig
-- [ ] Admin-User ist angelegt und nutzbar
-- [ ] API-Token ist erzeugt und ausschließlich via ENV konfiguriert
-- [ ] Projekt `CN3M0 PoC` kann angelegt werden
-- [ ] Task kann via MCP erzeugt werden
-- [ ] Task kann via MCP zwischen Spalten verschoben werden
-- [ ] Codex kann den Board-Zustand zusammenfassen
-- [ ] Reproduzierbare Verifikation ist dokumentiert
+- [x] `docker compose up` startet alle Kernservices vollständig
+- [x] Admin-User ist angelegt und nutzbar
+- [x] API-Token ist erzeugt und ausschließlich via ENV konfiguriert
+- [x] Projekt `CN3M0 PoC` kann angelegt werden
+- [x] Task kann via MCP erzeugt werden
+- [x] Task kann via MCP zwischen Spalten verschoben werden
+- [x] Codex kann den Board-Zustand zusammenfassen
+- [x] Reproduzierbare Verifikation ist dokumentiert
 
 ## 9. Start-zu-Ist Tracking (Checkliste)
 
 | Bereich | Startstatus (2026-02-27) | Aktueller Status | Nachweis |
 |---|---|---|---|
-| Infrastruktur (Compose, DB, Vikunja) | Geplant | TODO | Offen |
-| Initialisierung (Admin, Token) | Geplant | TODO | Offen |
-| MCP-Adapter (Tools) | Geplant | TODO | Offen |
-| Verifikation (E2E) | Geplant | TODO | Offen |
-| Sicherheit/Secrets | Anforderungen definiert | TODO | Offen |
-
+| Infrastruktur (Compose, DB, Vikunja) | Geplant | DONE | docker compose + Healthchecks aktiv |
+| Initialisierung (Admin, Token) | Geplant | DONE | `scripts/bootstrap_admin_and_token.py` |
+| MCP-Adapter (Tools) | Geplant | DONE | `mcp_adapter/vikunja_mcp/server.py` |
+| Verifikation (E2E) | Geplant | DONE | `scripts/verify_poc.py` erfolgreich |
+| Sicherheit/Secrets | Anforderungen definiert | DONE | Token nur in `.env`, `.gitignore` aktiv |
