@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare env file
+        run: cp .env.example .env
+
+      - name: Validate docker compose
+        run: docker compose config
+
+      - name: Compile Python sources
+        run: python3 -m compileall scripts mcp_adapter
+
+      - name: Validate Make targets
+        run: make help
+
