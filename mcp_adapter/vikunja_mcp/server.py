@@ -116,6 +116,20 @@ def create_task(
 
 
 @mcp.tool()
+def list_task_comments(task_id: int, order_by: str = "asc") -> dict[str, Any]:
+    """List comments for a specific task."""
+
+    return _run("list_task_comments", lambda: _client().list_task_comments(task_id=task_id, order_by=order_by))
+
+
+@mcp.tool()
+def add_task_comment(task_id: int, comment: str) -> dict[str, Any]:
+    """Add a comment to a specific task."""
+
+    return _run("add_task_comment", lambda: _client().add_task_comment(task_id=task_id, comment=comment))
+
+
+@mcp.tool()
 def move_task(
     task_id: int,
     target_bucket_id: int,

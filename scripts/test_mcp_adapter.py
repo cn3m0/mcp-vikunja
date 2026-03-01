@@ -158,7 +158,16 @@ def main() -> int:
         print(f"[OK] MCP initialize successful (session={client.session_id})")
 
         tools = client.tools_list()
-        expected = {"health", "list_projects", "create_project", "list_tasks", "create_task", "move_task"}
+        expected = {
+            "health",
+            "list_projects",
+            "create_project",
+            "list_tasks",
+            "create_task",
+            "list_task_comments",
+            "add_task_comment",
+            "move_task",
+        }
         missing = sorted(expected.difference(tools))
         if missing:
             raise RuntimeError(f"tools/list missing expected tools: {missing}")
@@ -183,4 +192,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

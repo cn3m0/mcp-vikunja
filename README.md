@@ -79,6 +79,8 @@ Runtime services:
 - `create_project`
 - `list_tasks`
 - `create_task`
+- `list_task_comments`
+- `add_task_comment`
 - `move_task`
 
 ### Design principles

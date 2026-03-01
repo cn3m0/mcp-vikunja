@@ -56,6 +56,7 @@ Network model:
   - list projects
   - list tasks
   - create tasks
+  - add task comments
   - move tasks
 
 ### Non-functional
@@ -101,6 +102,8 @@ Network model:
    - `create_project`
    - `list_tasks`
    - `create_task`
+   - `list_task_comments`
+   - `add_task_comment`
    - `move_task`
 3. API auth via Bearer token
 4. Implement robust error handling
@@ -145,6 +148,7 @@ The project is considered successful when:
 - `docker compose up` starts the full system
 - a project named `CN3M0 PoC` can be created
 - a task can be created via MCP
+- a task comment can be added via MCP
 - the task can be moved between Kanban columns
 - Codex can summarize board state
 
@@ -175,4 +179,3 @@ Codex should:
 - work deterministically
 - avoid unnecessary dependencies
 - keep the system minimal
-

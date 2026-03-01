@@ -104,7 +104,7 @@
 
 - Tasks:
   - create local MCP service
-  - implement tools: `health`, `list_projects`, `create_project`, `list_tasks`, `create_task`, `move_task`
+  - implement tools: `health`, `list_projects`, `create_project`, `list_tasks`, `create_task`, `list_task_comments`, `add_task_comment`, `move_task`
   - implement robust error handling
   - add minimal structured logging
 - Deliverables:
@@ -158,6 +158,12 @@
 - `create_task`
   - Input: `project_id` (required), `title` (required), `description` (optional), `bucket_id` (optional)
   - Output: created task with `id`
+- `list_task_comments`
+  - Input: `task_id` (required), optional `order_by` (`asc`/`desc`)
+  - Output: list with comment `id`, `comment`, `author`, timestamps
+- `add_task_comment`
+  - Input: `task_id` (required), `comment` (required)
+  - Output: created task comment with `id`
 - `move_task`
   - Input: `task_id` (required), `target_bucket_id` (required), optional `project_id`, `view_id`
   - Output: updated task bucket assignment
@@ -177,6 +183,9 @@
 - Task move:
   - Action: `move_task` to another Kanban bucket
   - Expectation: bucket/status updated
+- Task comment:
+  - Action: `add_task_comment` on an existing task
+  - Expectation: comment ID returned and comment is visible in task comments
 - Summary:
   - Action: read board data via MCP and generate board summary
   - Expectation: consistent, traceable summary output
@@ -225,6 +234,7 @@
 - [x] API token is generated and configured via env only
 - [x] project `CN3M0 PoC` can be created
 - [x] task can be created via MCP
+- [x] task comment can be added via MCP
 - [x] task can be moved between Kanban columns via MCP
 - [x] Codex can summarize board state
 - [x] reproducible verification is documented
@@ -238,4 +248,3 @@
 | MCP adapter (tools) | Planned | DONE | `mcp_adapter/vikunja_mcp/server.py` |
 | Verification (E2E) | Planned | DONE | `scripts/verify_poc.py` successful |
 | Security/secrets | Requirements defined | DONE | token only in `.env`, `.gitignore` active |
-

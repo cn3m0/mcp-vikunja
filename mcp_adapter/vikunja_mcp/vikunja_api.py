@@ -177,6 +177,27 @@ class VikunjaClient:
             raise VikunjaApiError("Unexpected response type while creating task", details=payload)
         return payload
 
+    def list_task_comments(self, task_id: int, order_by: str = "asc") -> list[dict[str, Any]]:
+        payload = self._request(
+            "GET",
+            f"/tasks/{task_id}/comments",
+            params={"order_by": order_by},
+        )
+        if not isinstance(payload, list):
+            raise VikunjaApiError("Unexpected response type while listing task comments", details=payload)
+        return payload
+
+    def add_task_comment(self, task_id: int, comment: str) -> dict[str, Any]:
+        body = {"comment": comment}
+        payload = self._request(
+            "PUT",
+            f"/tasks/{task_id}/comments",
+            json_data=body,
+        )
+        if not isinstance(payload, dict):
+            raise VikunjaApiError("Unexpected response type while creating task comment", details=payload)
+        return payload
+
     def get_task(self, task_id: int) -> dict[str, Any]:
         payload = self._request("GET", f"/tasks/{task_id}")
         if not isinstance(payload, dict):
