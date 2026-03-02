@@ -149,6 +149,30 @@ codex mcp list
 
 Note: `/mcp` is a Streamable HTTP MCP endpoint. Browser GET requests are not a valid MCP protocol test.
 
+### MCP Reconnect (Hard Refresh)
+
+If another Codex session still sees old tools, run this refresh sequence:
+
+1. Update project state:
+
+```bash
+git pull origin main
+```
+
+2. Rebuild/restart the MCP adapter with the latest code:
+
+```bash
+docker compose up -d --build mcp-adapter
+```
+
+3. Re-register MCP in Codex:
+
+```bash
+codex mcp remove vikunja
+codex mcp add vikunja --url http://localhost:8000/mcp
+codex mcp get vikunja
+```
+
 ## Operations
 
 Common commands:
