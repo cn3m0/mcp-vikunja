@@ -1,4 +1,4 @@
-# Task 33 - Runtime Target Decision Matrix (VPS vs NAS vs Mini-PC)
+# Task 33 - Runtime Strategy Decision (Phased Rollout)
 
 ## Context
 
@@ -44,33 +44,33 @@ Interpretation:
 | Router reboot | No impact | Temporary downtime | Temporary downtime |
 | Host hardware reboot | Managed restart policy | Manual intervention more likely | Manual intervention more likely |
 
-## Recommendation
+## Decision
 
-Recommended target:
-- Run the core stack (`vikunja`, `db`, `mcp-adapter`) on a VPS as baseline.
+Confirmed rollout strategy:
 
-Optional hybrid later:
-- Keep local worker execution (tmux/deep work) on PC when needed, but keep task system and MCP endpoint always-on in VPS.
+1. Phase A (now): develop on the current PC.
+2. Phase B (short-term optional): move to a dedicated always-on Codex PC.
+3. Phase C (long-term): run production on VPS and/or private NanoPi hosting.
 
 Rationale:
-- Best fit for the requirement that work must continue while personal hardware is offline.
-- Simplifies collaboration across multiple Codex sessions and devices.
+- Keeps current development speed high (no migration blocker now).
+- Adds an immediate always-on path when dedicated hardware is ready.
+- Preserves long-term goal of stable external availability via VPS and private-host flexibility via NanoPi.
 
-## Proposed Next Steps
+## Execution Consequences
 
-1. Confirm runtime choice: VPS baseline.
-2. Execute `Task #34` (minimal infrastructure baseline):
-   - reverse proxy with TLS
-   - Docker restart policies
-   - health checks
-   - backup schedule for PostgreSQL and config
-3. Define RTO/RPO targets:
-   - RTO: 15 minutes
-   - RPO: 24 hours (minimum baseline)
-4. Add monitoring + alerting (`Task #46`) after baseline deploy.
+1. `Task #34` must define a baseline for all three phases, not only VPS.
+2. Backup/restore and health checks should be implemented already in Phase A.
+3. Migration artifacts must be prepared so Phase B/C can be executed without redesign.
+
+## Next Steps
+
+1. Execute `Task #34` with profile-based baseline (PC, Codex box, VPS/NanoPi).
+2. Break down into small operational tasks under `To-Do`.
+3. Keep `Task #32` open until Phase A baseline is fully validated.
 
 ## Decision Status
 
-- Status: `Proposed`
+- Status: `Confirmed`
 - Owner: project maintainers
-- Pending confirmation: yes
+- Pending confirmation: no

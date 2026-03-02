@@ -72,6 +72,7 @@ Runtime services:
 - [Task 31 Bridge Plan](./docs/todo/task-31-vikunja-codex-session-bridge-plan.md)
 - [Task 33 Runtime Decision Matrix](./docs/todo/task-33-runtime-target-decision-matrix.md)
 - [Task 34 Minimal Infrastructure Baseline](./docs/todo/task-34-minimal-infrastructure-baseline.md)
+- [Task 49 Phase A Local Baseline Runbook](./docs/todo/task-49-phase-a-local-baseline-runbook.md)
 
 ## Features
 
