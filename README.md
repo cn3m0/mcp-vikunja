@@ -73,6 +73,15 @@ Runtime services:
 - [Task 33 Runtime Decision Matrix](./docs/todo/task-33-runtime-target-decision-matrix.md)
 - [Task 34 Minimal Infrastructure Baseline](./docs/todo/task-34-minimal-infrastructure-baseline.md)
 - [Task 49 Phase A Local Baseline Runbook](./docs/todo/task-49-phase-a-local-baseline-runbook.md)
+- [Task 50 Dedicated Codex Box Readiness Checklist](./docs/todo/task-50-dedicated-codex-box-readiness-checklist.md)
+- [Task 51 VPS Deployment Playbook](./docs/todo/task-51-vps-deployment-playbook.md)
+- [Task 52 NanoPi Private-Host Profile](./docs/todo/task-52-nanopi-private-host-profile.md)
+- [Task 35 Binding and Ownership Model](./docs/todo/task-35-binding-ownership-model.md)
+- [Task 36 MCP Reconnect Runbook](./docs/todo/task-36-mcp-reconnect-runbook.md)
+- [Task 37 Session Bootstrap Checklist](./docs/todo/task-37-session-bootstrap-checklist.md)
+- [Task 38 Task Command Flow](./docs/todo/task-38-task-command-flow.md)
+- [Task 39 Comment Write Verification](./docs/todo/task-39-comment-write-verification.md)
+- [Task 40 Task Lifecycle SOP](./docs/todo/task-40-task-lifecycle-sop.md)
 
 ## Features
 

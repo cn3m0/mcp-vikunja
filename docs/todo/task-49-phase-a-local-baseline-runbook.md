@@ -72,3 +72,29 @@ Mitigation:
 1. Team can execute start/verify flow without missing steps.
 2. One backup + one restore test documented.
 3. All related commands validated in current environment.
+
+## Execution Evidence (2026-03-02)
+
+Backup cycle:
+- Command executed: `pg_dump` via `docker compose exec db`
+- Backup file: `/tmp/mcp-vikunja-backups/vikunja_20260302T172758Z.sql`
+- Backup size: `119358` bytes
+
+Restore drill:
+- Test database: `vikunja_restore_test_20260302172812`
+- Restore completed successfully from the backup file
+- Validation query results:
+  - `tables=34`
+  - `projects=15`
+  - `tasks=53`
+  - `comments=22`
+- Cleanup completed: test database dropped
+
+Runtime verification:
+- `make verify` passed
+  - API reachable
+  - workflow task created and moved successfully
+- `make test-mcp` passed
+  - MCP initialize successful
+  - expected 8 tools available
+  - `health` and `list_projects` tool calls successful
