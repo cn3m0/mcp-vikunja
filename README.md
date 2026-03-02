@@ -69,6 +69,9 @@ Runtime services:
 - [Open Source Respect - Public Short Version](./OPEN_SOURCE_OF_CONDUCT_PUBLIC.md)
 - [Skills Overview](./skills/README.md)
 - [Main Deploy Skill](./skills/mcp-vikunja-deploy/SKILL.md)
+- [Task 31 Bridge Plan](./docs/todo/task-31-vikunja-codex-session-bridge-plan.md)
+- [Task 33 Runtime Decision Matrix](./docs/todo/task-33-runtime-target-decision-matrix.md)
+- [Task 34 Minimal Infrastructure Baseline](./docs/todo/task-34-minimal-infrastructure-baseline.md)
 
 ## Features
 
