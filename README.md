@@ -242,6 +242,7 @@ Validation:
 - `make test-api` (Vikunja API helper unit checks)
 - `make bridge-once` (one bridge poll cycle, optional `BRIDGE_DRY_RUN=1`)
 - `make monitor` (quick health checks: compose + API + MCP port)
+- `make monitor-webhook` (monitor + bridge-webhook health endpoint)
 - `make monitor-full` (monitor + verify + test-mcp smoke)
 - `make watchdog-once` (single watchdog cycle + status snapshot)
 - `make watchdog-loop` (continuous monitoring loop)
@@ -254,6 +255,9 @@ Monitoring + backup drill examples:
 ```bash
 # Quick status (non-destructive)
 make monitor
+
+# Quick status incl. webhook service/health
+make monitor-webhook
 
 # Full smoke check
 make monitor-full
@@ -408,6 +412,8 @@ Main variables in `.env.example`:
 - `BRIDGE_WEBHOOK_PATH`
 - `BRIDGE_WEBHOOK_TOKEN` (optional shared secret for webhook endpoint)
 - `BRIDGE_WEBHOOK_MAX_BODY_BYTES`
+- `BRIDGE_WEBHOOK_MONITOR` (default `false`; include webhook checks in monitor stack)
+- `BRIDGE_WEBHOOK_HEALTH_URL` (default `http://localhost:8090/healthz`)
 
 ## Security
 

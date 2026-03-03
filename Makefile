@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help onboard up bootstrap verify test-mcp test-bridge test-webhook test-api bridge-once monitor monitor-full watchdog-once watchdog-loop backup-drill full-check publish-check logs ps down clean
+.PHONY: help onboard up bootstrap verify test-mcp test-bridge test-webhook test-api bridge-once monitor monitor-webhook monitor-full watchdog-once watchdog-loop backup-drill full-check publish-check logs ps down clean
 
 help:
 	@echo "Available targets:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make test-api   - Run Vikunja API helper unit checks"
 	@echo "  make bridge-once - Run one bridge poll cycle (set BRIDGE_PROJECT_ID/BRIDGE_PROJECT_IDS, optional BRIDGE_DRY_RUN=1)"
 	@echo "  make monitor    - Quick local stack health checks"
+	@echo "  make monitor-webhook - Health checks incl. bridge-webhook"
 	@echo "  make monitor-full - Health checks + verify/test-mcp smoke"
 	@echo "  make watchdog-once - Run one watchdog cycle and write status json"
 	@echo "  make watchdog-loop - Continuous watchdog loop"
@@ -75,6 +76,9 @@ bridge-once:
 
 monitor:
 	python3 scripts/monitor_stack.py
+
+monitor-webhook:
+	python3 scripts/monitor_stack.py --check-webhook
 
 monitor-full:
 	python3 scripts/monitor_stack.py --full

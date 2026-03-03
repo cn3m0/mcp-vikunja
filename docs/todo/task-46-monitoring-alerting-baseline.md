@@ -56,10 +56,12 @@ Recommended minimum:
   - compose service status check (`db`, `vikunja`, `mcp-adapter`)
   - Vikunja API `/api/v1/info` reachability check
   - MCP adapter TCP reachability check
+  - optional webhook service/health check (`bridge-webhook`, `/healthz`) via `--check-webhook` or `BRIDGE_WEBHOOK_MONITOR=true`
   - optional `--full` smoke (`verify_poc.py` + `test_mcp_adapter.py`)
   - optional failure alert command (`--alert-command`)
 - Added Make targets:
   - `make monitor`
+  - `make monitor-webhook`
   - `make monitor-full`
 - Added `scripts/watchdog_loop.py` with:
   - periodic monitor execution (`monitor_stack.py --json`)

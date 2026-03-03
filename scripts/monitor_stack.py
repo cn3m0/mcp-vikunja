@@ -26,6 +26,19 @@ class CheckResult:
     elapsed_ms: int
 
 
+def parse_bool(raw: str | None, default: bool = False) -> bool:
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if not value:
+        return default
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
 def load_dotenv(path: Path) -> None:
     if not path.exists():
         return
@@ -86,6 +99,30 @@ def check_vikunja_info(base_public_url: str, timeout: float) -> CheckResult:
 
     elapsed = int((time.perf_counter() - start) * 1000)
     return CheckResult("vikunja-info", ok, detail, elapsed)
+
+
+def check_http_health(name: str, url: str, timeout: float) -> CheckResult:
+    start = time.perf_counter()
+    req = urllib.request.Request(url, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            status = int(getattr(response, "status", 200))
+            raw = response.read().decode("utf-8", errors="replace")
+        ok = 200 <= status < 300
+        detail = f"status={status}"
+        if raw:
+            try:
+                payload = json.loads(raw)
+                if isinstance(payload, dict) and payload:
+                    preview = ", ".join(sorted(list(payload.keys()))[:4])
+                    detail = f"{detail} keys={preview}"
+            except json.JSONDecodeError:
+                detail = f"{detail} body={raw[:80]}"
+    except (urllib.error.URLError, TimeoutError, ValueError) as exc:
+        ok = False
+        detail = f"http health check failed: {exc}"
+    elapsed = int((time.perf_counter() - start) * 1000)
+    return CheckResult(name, ok, detail, elapsed)
 
 
 def check_mcp_port(mcp_url: str, timeout: float) -> CheckResult:
@@ -153,6 +190,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--full", action="store_true", help="Also run verify_poc.py and test_mcp_adapter.py")
     parser.add_argument("--timeout", type=float, default=8.0, help="HTTP/TCP timeout seconds")
     parser.add_argument(
+        "--check-webhook",
+        action="store_true",
+        help="Also check bridge-webhook service and its /healthz endpoint",
+    )
+    parser.add_argument(
         "--alert-command",
         default="",
         help="Optional shell command executed on failure. Placeholder: {summary}",
@@ -167,12 +209,20 @@ def main() -> int:
 
     vikunja_public_url = os.getenv("VIKUNJA_PUBLIC_URL", "http://localhost:3456/")
     mcp_url = os.getenv("MCP_URL", "http://localhost:8000/mcp")
+    check_webhook = args.check_webhook or parse_bool(os.getenv("BRIDGE_WEBHOOK_MONITOR"), False)
+    webhook_health_url = os.getenv("BRIDGE_WEBHOOK_HEALTH_URL", "http://localhost:8090/healthz")
+
+    required_services = ["db", "vikunja", "mcp-adapter"]
+    if check_webhook:
+        required_services.append("bridge-webhook")
 
     results: list[CheckResult] = [
-        check_compose_services(["db", "vikunja", "mcp-adapter"]),
+        check_compose_services(required_services),
         check_vikunja_info(vikunja_public_url, timeout=args.timeout),
         check_mcp_port(mcp_url, timeout=args.timeout),
     ]
+    if check_webhook:
+        results.append(check_http_health("bridge-webhook-health", webhook_health_url, timeout=args.timeout))
 
     if args.full:
         results.extend(check_full_smoke())
