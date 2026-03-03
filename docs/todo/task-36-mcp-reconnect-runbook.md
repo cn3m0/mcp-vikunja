@@ -40,6 +40,7 @@ codex mcp list
   - `create_task`
   - `list_task_comments`
   - `add_task_comment`
+  - `get_task`
   - `update_task`
   - `move_task`
 

@@ -130,6 +130,13 @@ def add_task_comment(task_id: int, comment: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+def get_task(task_id: int) -> dict[str, Any]:
+    """Get a task by id."""
+
+    return _run("get_task", lambda: _client().get_task(task_id=task_id))
+
+
+@mcp.tool()
 def update_task(task_id: int, updates: dict[str, Any]) -> dict[str, Any]:
     """Update fields on an existing task."""
 

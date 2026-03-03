@@ -31,6 +31,8 @@ class FakeVikunjaClient(VikunjaClient):
         self.last_json = json_data
         if path.endswith("/comments"):
             return {"id": 1, "comment": (json_data or {}).get("comment", "")}
+        if path.startswith("/tasks/") and method == "GET":
+            return {"id": int(path.split("/")[2]), "title": "Sample task"}
         if path.startswith("/tasks/") and method == "POST":
             return {"id": int(path.split("/")[2]), **(json_data or {})}
         return {"id": 1}
@@ -85,6 +87,12 @@ def main() -> int:
     )
     assert_equal(fake.last_method, "PUT", "add_task_comment should use PUT")
     assert_equal(fake.last_path, "/tasks/64/comments", "add_task_comment path mismatch")
+
+    # get_task should read /tasks/{id}
+    fetched = fake.get_task(task_id=64)
+    assert_equal(fake.last_method, "GET", "get_task should use GET")
+    assert_equal(fake.last_path, "/tasks/64", "get_task path mismatch")
+    assert_equal(fetched.get("id"), 64, "get_task response mismatch")
 
     # update_task should pass payload as-is to /tasks/{id}
     updates = {"title": "Updated title", "done": True}

@@ -13,6 +13,7 @@ Goal:
 1. Read phase
 - `list_projects`
 - `list_tasks`
+- `get_task` (direct read by task ID, useful from `/tasks/<id>` URLs)
 - `list_task_comments` (if task context is needed)
 
 2. Write phase
