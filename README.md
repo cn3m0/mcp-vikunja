@@ -82,6 +82,13 @@ Runtime services:
 - [Task 38 Task Command Flow](./docs/todo/task-38-task-command-flow.md)
 - [Task 39 Comment Write Verification](./docs/todo/task-39-comment-write-verification.md)
 - [Task 40 Task Lifecycle SOP](./docs/todo/task-40-task-lifecycle-sop.md)
+- [Task 41 Idempotency and Safety Guardrails](./docs/todo/task-41-idempotency-safety-guardrails.md)
+- [Task 42 Naming and Dedup Convention](./docs/todo/task-42-naming-and-dedup-convention.md)
+- [Task 43 Safe Execution Policy](./docs/todo/task-43-safe-execution-policy.md)
+- [Task 44 Operational Hardening and Recovery](./docs/todo/task-44-operational-hardening-recovery.md)
+- [Task 45 Offline/Sleep Behavior Matrix](./docs/todo/task-45-offline-sleep-behavior-matrix.md)
+- [Task 46 Monitoring and Alerting Baseline](./docs/todo/task-46-monitoring-alerting-baseline.md)
+- [Task 47 Backup/Restore Drill Protocol](./docs/todo/task-47-backup-restore-drill-protocol.md)
 
 ## Features
 

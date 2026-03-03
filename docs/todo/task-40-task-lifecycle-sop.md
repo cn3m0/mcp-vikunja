@@ -23,6 +23,7 @@ To-Do -> Doing:
 Doing -> Done:
 - Only after deliverable exists and is verifiable.
 - Add `done:` comment with evidence links (docs, checks, command results).
+- Set `start_date` and `end_date` on the task for timeline/Gantt tracking.
 
 Doing -> To-Do:
 - Allowed if blocked by dependency or decision pending.
@@ -43,6 +44,7 @@ A task is done when:
 2. Relevant checks were executed.
 3. Result is documented in the task comment.
 4. Task moved to `Done`.
+5. `start_date` and `end_date` are set.
 
 ## Operational Guardrails
 
