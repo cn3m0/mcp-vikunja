@@ -92,12 +92,46 @@ def parse_bind_block(text: str) -> dict[str, str] | None:
 
 
 def parse_allowed_users(raw: str | None) -> set[str] | None:
+    return parse_lower_set(raw)
+
+
+def parse_lower_set(raw: str | None) -> set[str] | None:
     if raw is None:
         return None
     values = {part.strip().lower() for part in raw.split(",") if part.strip()}
     if not values:
         return None
     return values
+
+
+def parse_int_set(raw: str | None) -> set[int] | None:
+    if raw is None:
+        return None
+    values: set[int] = set()
+    for part in raw.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        try:
+            values.add(int(token))
+        except ValueError:
+            continue
+    if not values:
+        return None
+    return values
+
+
+def parse_bool(raw: str | None, default: bool = False) -> bool:
+    if raw is None:
+        return default
+    value = raw.strip().lower()
+    if not value:
+        return default
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return default
 
 
 def render_notify_command(template: str, values: dict[str, str]) -> str:
@@ -151,8 +185,7 @@ def read_mode_file(path: Path | None) -> str | None:
 
 
 def task_mode(task: dict[str, Any], fallback_mode: str | None = None) -> str:
-    labels = task.get("labels") or []
-    titles = {str(label.get("title", "")).lower() for label in labels if isinstance(label, dict)}
+    titles = task_label_titles(task)
     if "mode/human" in titles:
         return "human"
     if "mode/ai" in titles:
@@ -160,6 +193,42 @@ def task_mode(task: dict[str, Any], fallback_mode: str | None = None) -> str:
     if fallback_mode == "ai":
         return "ai"
     return "human"
+
+
+def task_label_titles(task: dict[str, Any]) -> set[str]:
+    labels = task.get("labels") or []
+    return {str(label.get("title", "")).lower() for label in labels if isinstance(label, dict)}
+
+
+def should_process_task(
+    task: dict[str, Any],
+    *,
+    mode: str,
+    skip_done: bool,
+    allowed_bucket_ids: set[int] | None,
+    required_labels: set[str] | None,
+) -> tuple[bool, str]:
+    if mode != "ai":
+        return False, "mode"
+
+    if skip_done and bool(task.get("done", False)):
+        return False, "done"
+
+    if allowed_bucket_ids is not None:
+        bucket_id = task.get("bucket_id")
+        try:
+            bucket = int(bucket_id)
+        except (TypeError, ValueError):
+            return False, "bucket"
+        if bucket not in allowed_bucket_ids:
+            return False, "bucket"
+
+    if required_labels is not None:
+        titles = task_label_titles(task)
+        if titles.isdisjoint(required_labels):
+            return False, "labels"
+
+    return True, "selected"
 
 
 @dataclass
@@ -229,6 +298,9 @@ class BridgeWorker:
         notify_command: str = "",
         notify_timeout_seconds: int = 8,
         mode_file_path: Path | None = None,
+        skip_done: bool = True,
+        allowed_bucket_ids: set[int] | None = None,
+        required_labels: set[str] | None = None,
     ) -> None:
         self.client = client
         self.project_id = project_id
@@ -239,6 +311,9 @@ class BridgeWorker:
         self.notify_command = notify_command.strip()
         self.notify_timeout_seconds = max(notify_timeout_seconds, 1)
         self.mode_file_path = mode_file_path
+        self.skip_done = skip_done
+        self.allowed_bucket_ids = allowed_bucket_ids
+        self.required_labels = required_labels
 
     def run_once(self) -> None:
         tasks = self.client.list_tasks(project_id=self.project_id, page=1, per_page=300)
@@ -247,12 +322,42 @@ class BridgeWorker:
             LOGGER.info("Bridge mode fallback from file %s => %s", self.mode_file_path, fallback_mode)
         LOGGER.info("Found %d tasks in project %s", len(tasks), self.project_id)
 
+        selected = 0
+        skipped_mode = 0
+        skipped_done = 0
+        skipped_bucket = 0
+        skipped_labels = 0
+
         for task in sorted(tasks, key=lambda t: int(t.get("id", 0))):
             mode = task_mode(task, fallback_mode=fallback_mode)
-            if mode != "ai":
+            allowed, reason = should_process_task(
+                task,
+                mode=mode,
+                skip_done=self.skip_done,
+                allowed_bucket_ids=self.allowed_bucket_ids,
+                required_labels=self.required_labels,
+            )
+            if not allowed:
+                if reason == "mode":
+                    skipped_mode += 1
+                elif reason == "done":
+                    skipped_done += 1
+                elif reason == "bucket":
+                    skipped_bucket += 1
+                elif reason == "labels":
+                    skipped_labels += 1
                 continue
+            selected += 1
             self._process_task(task)
 
+        LOGGER.info(
+            "Selection summary: selected=%d skipped_mode=%d skipped_done=%d skipped_bucket=%d skipped_labels=%d",
+            selected,
+            skipped_mode,
+            skipped_done,
+            skipped_bucket,
+            skipped_labels,
+        )
         self.state.save()
 
     def _process_task(self, task: dict[str, Any]) -> None:
@@ -607,6 +712,22 @@ def parse_args() -> argparse.Namespace:
         default=os.getenv("BRIDGE_MODE_FILE", ""),
         help="Optional fallback mode file path (supports lines like `mode=ai` or `mode=human`)",
     )
+    parser.add_argument(
+        "--skip-done",
+        action=argparse.BooleanOptionalAction,
+        default=parse_bool(os.getenv("BRIDGE_SKIP_DONE"), True),
+        help="Skip tasks already marked done (default: true)",
+    )
+    parser.add_argument(
+        "--allowed-bucket-ids",
+        default=os.getenv("BRIDGE_ALLOWED_BUCKET_IDS", ""),
+        help="Optional comma-separated bucket IDs to process",
+    )
+    parser.add_argument(
+        "--required-labels",
+        default=os.getenv("BRIDGE_REQUIRED_LABELS", ""),
+        help="Optional comma-separated labels required for processing",
+    )
     parser.add_argument("--once", action="store_true", help="Run one poll cycle and exit")
     parser.add_argument("--dry-run", action="store_true", help="Do not write files or comments")
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
@@ -632,6 +753,9 @@ def main() -> int:
             notify_command=args.notify_command,
             notify_timeout_seconds=args.notify_timeout_seconds,
             mode_file_path=Path(args.mode_file).expanduser() if args.mode_file else None,
+            skip_done=bool(args.skip_done),
+            allowed_bucket_ids=parse_int_set(args.allowed_bucket_ids),
+            required_labels=parse_lower_set(args.required_labels),
         )
         if args.once:
             worker.run_once()

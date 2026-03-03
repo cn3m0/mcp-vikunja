@@ -219,6 +219,7 @@ If session binding invalid/missing:
 - Implemented pull-based bridge worker with persistent state watermark.
 - Implemented `mode/ai` gate and bind parsing.
 - Added optional ownership fallback file support (`BRIDGE_MODE_FILE`) with label precedence preserved.
+- Added optional task selection filters (`BRIDGE_SKIP_DONE`, `BRIDGE_ALLOWED_BUCKET_IDS`, `BRIDGE_REQUIRED_LABELS`) to reduce noise and process only execution-relevant tasks.
 - Implemented level-2 action confirmation policy (`move`, `reopen`) with TTL and one-time token semantics.
 - Added optional confirmation author allowlist (`BRIDGE_CONFIRM_ALLOWED_USERS`).
 - Added optional queue notification hook (`BRIDGE_NOTIFY_COMMAND`) for tmux/ntfy/local operator alerts when new work-order files are created.

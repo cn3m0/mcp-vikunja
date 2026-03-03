@@ -120,6 +120,10 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
 - pull-based polling loop
 - ownership gate via labels (`mode/ai`, `mode/human`)
 - optional ownership fallback via `BRIDGE_MODE_FILE` (`mode=ai|human`) when labels are missing
+- optional task-selection filters:
+  - `BRIDGE_SKIP_DONE=true|false`
+  - `BRIDGE_ALLOWED_BUCKET_IDS=40,41`
+  - `BRIDGE_REQUIRED_LABELS=size/s,size/m`
 - `[bind]...[/bind]` parsing (`node`, `session`, `workdir`)
 - idempotent state watermark (`last_processed_comment_id`)
 - bridge comment prefix protection (`[bridge]`)
@@ -272,6 +276,9 @@ BRIDGE_PROJECT_ID=13 BRIDGE_DRY_RUN=1 make bridge-once
 # Continuous bridge worker via compose profile
 docker compose --profile bridge up -d --build bridge-worker
 
+# Restrict processing to active execution buckets + size labels
+BRIDGE_PROJECT_ID=13 BRIDGE_ALLOWED_BUCKET_IDS=40,41 BRIDGE_REQUIRED_LABELS=size/s,size/m make bridge-once
+
 # Direct python invocation (export .env first)
 set -a; source .env; set +a
 PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker --project-id 13 --once
@@ -341,6 +348,9 @@ Main variables in `.env.example`:
 - `BRIDGE_NOTIFY_COMMAND` (optional shell command for queue notifications)
 - `BRIDGE_NOTIFY_TIMEOUT_SECONDS`
 - `BRIDGE_MODE_FILE` (optional fallback mode file path)
+- `BRIDGE_SKIP_DONE` (default `true`, skip tasks where `done=true`)
+- `BRIDGE_ALLOWED_BUCKET_IDS` (optional comma-separated bucket IDs to include)
+- `BRIDGE_REQUIRED_LABELS` (optional comma-separated labels, at least one must match)
 
 ## Security
 

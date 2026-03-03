@@ -61,6 +61,8 @@ bridge-once:
 	  --notify-command "$${BRIDGE_NOTIFY_COMMAND:-}" \
 	  --notify-timeout-seconds "$${BRIDGE_NOTIFY_TIMEOUT_SECONDS:-8}" \
 	  --mode-file "$${BRIDGE_MODE_FILE:-}" \
+	  --allowed-bucket-ids "$${BRIDGE_ALLOWED_BUCKET_IDS:-}" \
+	  --required-labels "$${BRIDGE_REQUIRED_LABELS:-}" \
 	  --once $$EXTRA
 
 monitor:

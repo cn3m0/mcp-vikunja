@@ -83,6 +83,9 @@ services:
       BRIDGE_NOTIFY_COMMAND: ${BRIDGE_NOTIFY_COMMAND:-}
       BRIDGE_NOTIFY_TIMEOUT_SECONDS: ${BRIDGE_NOTIFY_TIMEOUT_SECONDS:-8}
       BRIDGE_MODE_FILE: ${BRIDGE_MODE_FILE:-}
+      BRIDGE_SKIP_DONE: ${BRIDGE_SKIP_DONE:-true}
+      BRIDGE_ALLOWED_BUCKET_IDS: ${BRIDGE_ALLOWED_BUCKET_IDS:-}
+      BRIDGE_REQUIRED_LABELS: ${BRIDGE_REQUIRED_LABELS:-}
       LOG_LEVEL: INFO
     command:
       [
@@ -105,6 +108,10 @@ services:
         "${BRIDGE_NOTIFY_TIMEOUT_SECONDS:-8}",
         "--mode-file",
         "${BRIDGE_MODE_FILE:-}",
+        "--allowed-bucket-ids",
+        "${BRIDGE_ALLOWED_BUCKET_IDS:-}",
+        "--required-labels",
+        "${BRIDGE_REQUIRED_LABELS:-}",
       ]
     volumes:
       - bridge_state:/var/lib/vikunja-bridge

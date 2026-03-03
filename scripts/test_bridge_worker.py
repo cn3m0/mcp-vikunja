@@ -17,12 +17,16 @@ from vikunja_mcp.bridge_worker import (  # noqa: E402
     comment_author_username,
     parse_action_command,
     parse_allowed_users,
+    parse_bool,
     parse_bind_block,
     parse_command,
     parse_confirmation_token,
+    parse_int_set,
+    parse_lower_set,
     parse_mode_value,
     read_mode_file,
     render_notify_command,
+    should_process_task,
     task_mode,
 )
 from vikunja_mcp.vikunja_api import VikunjaClient  # noqa: E402
@@ -104,6 +108,12 @@ def main() -> int:
 
     # parse_allowed_users + comment_author_username
     assert_equal(parse_allowed_users("admin, OpsBot"), {"admin", "opsbot"}, "allowed users parse failed")
+    assert_equal(parse_lower_set("X, y"), {"x", "y"}, "lower set parse failed")
+    assert_equal(parse_int_set("40, 41, x"), {40, 41}, "int set parse failed")
+    assert_equal(parse_int_set(""), None, "empty int set should be None")
+    assert_equal(parse_bool("yes"), True, "bool yes parse failed")
+    assert_equal(parse_bool("0", default=True), False, "bool false parse failed")
+    assert_equal(parse_bool("unknown", default=True), True, "bool default fallback failed")
     assert_equal(parse_allowed_users(""), None, "empty allowlist should disable restriction")
     assert_equal(parse_mode_value("mode=ai"), "ai", "mode parser should support key=value")
     assert_equal(parse_mode_value("human"), "human", "mode parser should support plain value")
@@ -129,6 +139,42 @@ def main() -> int:
     assert_equal(mode_human_label, "human", "mode/human label must override fallback")
     assert_equal(mode_ai_fallback, "ai", "fallback mode file should allow ai mode without label")
     assert_equal(mode_human, "human", "default mode should be human")
+
+    allowed, reason = should_process_task(
+        {"id": 1, "done": False, "bucket_id": 40, "labels": [{"title": "mode/ai"}, {"title": "size/M"}]},
+        mode="ai",
+        skip_done=True,
+        allowed_bucket_ids={40},
+        required_labels={"size/m"},
+    )
+    assert_equal((allowed, reason), (True, "selected"), "task selection positive case failed")
+
+    allowed, reason = should_process_task(
+        {"id": 2, "done": True, "bucket_id": 40, "labels": [{"title": "mode/ai"}]},
+        mode="ai",
+        skip_done=True,
+        allowed_bucket_ids=None,
+        required_labels=None,
+    )
+    assert_equal((allowed, reason), (False, "done"), "task selection done filter failed")
+
+    allowed, reason = should_process_task(
+        {"id": 3, "done": False, "bucket_id": 41, "labels": [{"title": "mode/ai"}]},
+        mode="ai",
+        skip_done=False,
+        allowed_bucket_ids={40},
+        required_labels=None,
+    )
+    assert_equal((allowed, reason), (False, "bucket"), "task selection bucket filter failed")
+
+    allowed, reason = should_process_task(
+        {"id": 4, "done": False, "bucket_id": 40, "labels": [{"title": "mode/ai"}]},
+        mode="ai",
+        skip_done=False,
+        allowed_bucket_ids=None,
+        required_labels={"size/l"},
+    )
+    assert_equal((allowed, reason), (False, "labels"), "task selection label filter failed")
 
     with tempfile.TemporaryDirectory(prefix="bridge-mode-file-") as tmpdir:
         mode_file = Path(tmpdir) / ".bridge-mode"
