@@ -528,6 +528,9 @@ class BridgeWorker:
         allow_mode_comment_override: bool = False,
         project_filters: dict[int, dict[str, Any]] | None = None,
         auto_move_buckets: dict[str, int] | None = None,
+        auto_set_start_date_on_ack: bool = False,
+        auto_set_done_on_done: bool = False,
+        auto_set_end_date_on_done: bool = False,
     ) -> None:
         self.client = client
         merged_project_ids = merge_project_ids(project_id, project_ids or [])
@@ -552,6 +555,9 @@ class BridgeWorker:
         self.allow_mode_comment_override = allow_mode_comment_override
         self.project_filters = project_filters or {}
         self.auto_move_buckets = auto_move_buckets or {}
+        self.auto_set_start_date_on_ack = bool(auto_set_start_date_on_ack)
+        self.auto_set_done_on_done = bool(auto_set_done_on_done)
+        self.auto_set_end_date_on_done = bool(auto_set_end_date_on_done)
 
     def _effective_project_filters(self, project_id: int) -> tuple[bool, set[int] | None, set[str] | None]:
         config = self.project_filters.get(project_id, {})
@@ -752,6 +758,7 @@ class BridgeWorker:
                 task_id,
                 f"ack: queued command={command_name} comment_id={comment_id} file={output_path}",
             )
+            self._maybe_auto_update_task_fields(task=task, command_name=command_name)
             self._maybe_auto_move_task(task=task, command_name=command_name)
             notify_error = self._notify_queue_event(
                 task=task,
@@ -767,6 +774,41 @@ class BridgeWorker:
                 )
         except Exception as exc:  # pragma: no cover - top-level safety
             self._post_bridge_comment(task_id, f"blocked: could not queue command_id={comment_id} reason={exc}")
+
+    def _maybe_auto_update_task_fields(self, *, task: dict[str, Any], command_name: str) -> None:
+        updates: dict[str, Any] = {}
+        if command_name == "ack" and self.auto_set_start_date_on_ack and not task.get("start_date"):
+            updates["start_date"] = _now_iso()
+
+        if command_name == "done":
+            if self.auto_set_done_on_done:
+                updates["done"] = True
+            if self.auto_set_end_date_on_done and not task.get("end_date"):
+                updates["end_date"] = _now_iso()
+
+        if not updates:
+            return
+
+        task_id = int(task["id"])
+        if self.dry_run:
+            LOGGER.info("Dry-run: auto-update task#%s command=%s updates=%s", task_id, command_name, updates)
+            return
+
+        try:
+            payload = self.client.update_task(task_id=task_id, updates=updates)
+            if isinstance(payload, dict):
+                task.update(payload)
+            else:
+                task.update(updates)
+            self._post_bridge_comment(
+                task_id,
+                f"update: auto-updated fields reason=command:{command_name} fields={','.join(sorted(updates))}",
+            )
+        except Exception as exc:
+            self._post_bridge_comment(
+                task_id,
+                f"update: auto-update failed reason=command:{command_name} details={exc}",
+            )
 
     def _maybe_auto_move_task(self, *, task: dict[str, Any], command_name: str) -> None:
         target_bucket_id = self.auto_move_buckets.get(command_name)
@@ -1169,6 +1211,24 @@ def parse_args() -> argparse.Namespace:
         help="Optional bucket id to auto-move task after `blocked:` command is queued",
     )
     parser.add_argument(
+        "--auto-set-start-date-on-ack",
+        action=argparse.BooleanOptionalAction,
+        default=parse_bool(os.getenv("BRIDGE_AUTO_SET_START_DATE_ON_ACK"), False),
+        help="Auto-set start_date when `ack:` command is queued (default: false)",
+    )
+    parser.add_argument(
+        "--auto-set-done-on-done",
+        action=argparse.BooleanOptionalAction,
+        default=parse_bool(os.getenv("BRIDGE_AUTO_SET_DONE_ON_DONE"), False),
+        help="Auto-set done=true when `done:` command is queued (default: false)",
+    )
+    parser.add_argument(
+        "--auto-set-end-date-on-done",
+        action=argparse.BooleanOptionalAction,
+        default=parse_bool(os.getenv("BRIDGE_AUTO_SET_END_DATE_ON_DONE"), False),
+        help="Auto-set end_date when `done:` command is queued (default: false)",
+    )
+    parser.add_argument(
         "--pending-comments-file",
         default=os.getenv("BRIDGE_PENDING_COMMENTS_FILE", ""),
         help="Optional JSONL file for bridge comments that failed to post",
@@ -1246,6 +1306,9 @@ def main() -> int:
                 done_bucket_id=parse_optional_int(args.auto_move_done_bucket_id),
                 blocked_bucket_id=parse_optional_int(args.auto_move_blocked_bucket_id),
             ),
+            auto_set_start_date_on_ack=bool(args.auto_set_start_date_on_ack),
+            auto_set_done_on_done=bool(args.auto_set_done_on_done),
+            auto_set_end_date_on_done=bool(args.auto_set_end_date_on_done),
         )
         if args.once:
             worker.run_once()

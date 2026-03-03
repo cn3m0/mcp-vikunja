@@ -347,6 +347,40 @@ def main() -> int:
     assert_equal(notify_file.read_text(encoding="utf-8"), "125:update:77", "notify command output mismatch")
     notify_file.unlink(missing_ok=True)
 
+    # queue command may auto-set start/end dates and done status
+    fake_auto_dates = FakeClient()
+    worker_auto_dates = BridgeWorker(
+        client=fake_auto_dates,  # type: ignore[arg-type]
+        project_id=13,
+        state_path=Path("/tmp/test-bridge-worker-state-auto-dates.json"),
+        dry_run=False,
+        auto_set_start_date_on_ack=True,
+        auto_set_done_on_done=True,
+        auto_set_end_date_on_done=True,
+    )
+    with tempfile.TemporaryDirectory(prefix="bridge-auto-dates-test-") as tmpdir:
+        task_payload = {"id": 127, "project_id": 13, "title": "Auto Dates Demo"}
+        worker_auto_dates._handle_queue_command(
+            task=task_payload,
+            comment_id=79,
+            command_name="ack",
+            command_body="start now",
+            binding={"node": "np1", "session": "s", "workdir": tmpdir},
+        )
+        worker_auto_dates._handle_queue_command(
+            task=task_payload,
+            comment_id=80,
+            command_name="done",
+            command_body="finish now",
+            binding={"node": "np1", "session": "s", "workdir": tmpdir},
+        )
+    assert_equal(len(fake_auto_dates.updates), 2, "ack+done should trigger two update_task calls")
+    ack_updates = fake_auto_dates.updates[0][1]
+    done_updates = fake_auto_dates.updates[1][1]
+    assert_equal("start_date" in ack_updates, True, "ack auto-date should set start_date")
+    assert_equal(done_updates.get("done"), True, "done auto-update should set done=true")
+    assert_equal("end_date" in done_updates, True, "done auto-date should set end_date")
+
     # queue command may auto-move task by command type
     fake_auto_move = FakeClient()
     worker_auto_move = BridgeWorker(
