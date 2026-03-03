@@ -228,6 +228,7 @@ If session binding invalid/missing:
 - Added multi-project polling support (`BRIDGE_PROJECT_IDS` / `--project-ids`) with backward compatibility for single `BRIDGE_PROJECT_ID`.
 - Added optional task-level mode override via comments (`mode: ai|human`) behind `BRIDGE_ALLOW_MODE_COMMENT_OVERRIDE`.
 - Added per-project filter overrides (`BRIDGE_PROJECT_FILTERS_JSON` / `--project-filters-json`) for `skip_done`, `allowed_bucket_ids`, and `required_labels`.
+- Added optional webhook trigger service (`bridge_webhook`) that updates `BRIDGE_TRIGGER_FILE` to wake the pull worker immediately.
 
 ## Open Questions
 

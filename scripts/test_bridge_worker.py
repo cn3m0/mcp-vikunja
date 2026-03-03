@@ -35,6 +35,7 @@ from vikunja_mcp.bridge_worker import (  # noqa: E402
     task_mode_with_override,
     task_mode,
     latest_mode_override_from_comments,
+    TriggerFileWatcher,
 )
 from vikunja_mcp.vikunja_api import VikunjaClient  # noqa: E402
 
@@ -188,6 +189,16 @@ def main() -> int:
         "author username extraction failed",
     )
     assert_equal(comment_author_username({"author": {}}), None, "missing author username should be None")
+
+    with tempfile.TemporaryDirectory(prefix="bridge-trigger-watch-") as tmpdir:
+        trigger_file = Path(tmpdir) / "trigger.signal"
+        watcher = TriggerFileWatcher(trigger_file)
+        assert_equal(watcher.poll(), False, "watcher should not trigger before file exists")
+        trigger_file.write_text("a", encoding="utf-8")
+        assert_equal(watcher.poll(), True, "watcher should trigger on first write")
+        assert_equal(watcher.poll(), False, "watcher should not retrigger without changes")
+        trigger_file.write_text("b", encoding="utf-8")
+        assert_equal(watcher.poll(), True, "watcher should trigger on update")
 
     # task_mode
     mode_ai = task_mode({"labels": [{"title": "mode/ai"}]})

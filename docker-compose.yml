@@ -93,6 +93,8 @@ services:
       BRIDGE_PENDING_COMMENTS_MAX: ${BRIDGE_PENDING_COMMENTS_MAX:-500}
       BRIDGE_BACKOFF_MIN_SECONDS: ${BRIDGE_BACKOFF_MIN_SECONDS:-5}
       BRIDGE_BACKOFF_MAX_SECONDS: ${BRIDGE_BACKOFF_MAX_SECONDS:-300}
+      BRIDGE_TRIGGER_FILE: ${BRIDGE_TRIGGER_FILE:-/var/lib/vikunja-bridge/trigger.signal}
+      BRIDGE_TRIGGER_CHECK_SECONDS: ${BRIDGE_TRIGGER_CHECK_SECONDS:-1.0}
       LOG_LEVEL: INFO
     command:
       [
@@ -131,10 +133,52 @@ services:
         "${BRIDGE_BACKOFF_MIN_SECONDS:-5}",
         "--backoff-max-seconds",
         "${BRIDGE_BACKOFF_MAX_SECONDS:-300}",
+        "--trigger-file",
+        "${BRIDGE_TRIGGER_FILE:-/var/lib/vikunja-bridge/trigger.signal}",
+        "--trigger-check-seconds",
+        "${BRIDGE_TRIGGER_CHECK_SECONDS:-1.0}",
       ]
     volumes:
       - bridge_state:/var/lib/vikunja-bridge
       - bridge_work:/srv/work
+    networks:
+      - vikunja_net
+
+  bridge-webhook:
+    build:
+      context: ./mcp_adapter
+    profiles: ["bridge", "webhook"]
+    restart: unless-stopped
+    environment:
+      BRIDGE_WEBHOOK_HOST: 0.0.0.0
+      BRIDGE_WEBHOOK_PORT: ${BRIDGE_WEBHOOK_PORT:-8090}
+      BRIDGE_WEBHOOK_PATH: ${BRIDGE_WEBHOOK_PATH:-/vikunja/webhook}
+      BRIDGE_WEBHOOK_TOKEN: ${BRIDGE_WEBHOOK_TOKEN:-}
+      BRIDGE_WEBHOOK_MAX_BODY_BYTES: ${BRIDGE_WEBHOOK_MAX_BODY_BYTES:-1048576}
+      BRIDGE_TRIGGER_FILE: ${BRIDGE_TRIGGER_FILE:-/var/lib/vikunja-bridge/trigger.signal}
+      LOG_LEVEL: INFO
+    command:
+      [
+        "python",
+        "-m",
+        "vikunja_mcp.bridge_webhook",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "${BRIDGE_WEBHOOK_PORT:-8090}",
+        "--path",
+        "${BRIDGE_WEBHOOK_PATH:-/vikunja/webhook}",
+        "--token",
+        "${BRIDGE_WEBHOOK_TOKEN:-}",
+        "--trigger-file",
+        "${BRIDGE_TRIGGER_FILE:-/var/lib/vikunja-bridge/trigger.signal}",
+        "--max-body-bytes",
+        "${BRIDGE_WEBHOOK_MAX_BODY_BYTES:-1048576}",
+      ]
+    ports:
+      - "${BRIDGE_WEBHOOK_PORT:-8090}:${BRIDGE_WEBHOOK_PORT:-8090}"
+    volumes:
+      - bridge_state:/var/lib/vikunja-bridge
     networks:
       - vikunja_net
 

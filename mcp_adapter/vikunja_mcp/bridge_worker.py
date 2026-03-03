@@ -24,6 +24,44 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class TriggerFileWatcher:
+    def __init__(self, path: Path | None) -> None:
+        self.path = path
+        self._last_marker = self._marker()
+
+    def _marker(self) -> str:
+        if self.path is None:
+            return ""
+        try:
+            stat = self.path.stat()
+            return f"{stat.st_mtime_ns}:{stat.st_size}"
+        except OSError:
+            return ""
+
+    def poll(self) -> bool:
+        marker = self._marker()
+        if marker and marker != self._last_marker:
+            self._last_marker = marker
+            return True
+        self._last_marker = marker
+        return False
+
+    def wait(self, seconds: int, poll_interval_seconds: float = 1.0) -> bool:
+        total = max(int(seconds), 0)
+        if total <= 0:
+            return self.poll()
+
+        interval = max(float(poll_interval_seconds), 0.1)
+        deadline = time.monotonic() + total
+        while True:
+            if self.poll():
+                return True
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            time.sleep(min(interval, remaining))
+
+
 def normalize_text(raw: str) -> str:
     # Vikunja comment payload may contain basic html wrappers.
     text = re.sub(r"<[^>]+>", "", raw or "")
@@ -1076,6 +1114,17 @@ def parse_args() -> argparse.Namespace:
         default=int(os.getenv("BRIDGE_BACKOFF_MAX_SECONDS", "300")),
         help="Retry backoff maximum delay in seconds for failed cycles",
     )
+    parser.add_argument(
+        "--trigger-file",
+        default=os.getenv("BRIDGE_TRIGGER_FILE", ""),
+        help="Optional trigger file path; when touched, next cycle runs immediately",
+    )
+    parser.add_argument(
+        "--trigger-check-seconds",
+        type=float,
+        default=float(os.getenv("BRIDGE_TRIGGER_CHECK_SECONDS", "1.0")),
+        help="Polling interval while waiting for trigger file updates",
+    )
     parser.add_argument("--once", action="store_true", help="Run one poll cycle and exit")
     parser.add_argument("--dry-run", action="store_true", help="Do not write files or comments")
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
@@ -1121,12 +1170,20 @@ def main() -> int:
             return 0
 
         LOGGER.info("Starting bridge worker (project_ids=%s interval=%ss)", merged_project_ids, args.interval)
+        trigger_watcher = TriggerFileWatcher(Path(args.trigger_file).expanduser() if args.trigger_file else None)
+        if args.trigger_file:
+            LOGGER.info("Bridge trigger file enabled: %s", args.trigger_file)
         consecutive_failures = 0
         while True:
             try:
                 worker.run_once()
                 consecutive_failures = 0
-                time.sleep(max(args.interval, 1))
+                woke_by_trigger = trigger_watcher.wait(
+                    max(args.interval, 1),
+                    poll_interval_seconds=args.trigger_check_seconds,
+                )
+                if woke_by_trigger:
+                    LOGGER.info("Bridge wake-up: trigger file updated")
             except VikunjaApiError as exc:
                 consecutive_failures += 1
                 delay = compute_backoff_seconds(
@@ -1140,7 +1197,12 @@ def main() -> int:
                     exc,
                     delay,
                 )
-                time.sleep(delay)
+                woke_by_trigger = trigger_watcher.wait(
+                    delay,
+                    poll_interval_seconds=args.trigger_check_seconds,
+                )
+                if woke_by_trigger:
+                    LOGGER.info("Bridge wake-up during backoff: trigger file updated")
             except Exception as exc:  # pragma: no cover - defensive runtime handling
                 consecutive_failures += 1
                 delay = compute_backoff_seconds(
@@ -1154,7 +1216,12 @@ def main() -> int:
                     exc,
                     delay,
                 )
-                time.sleep(delay)
+                woke_by_trigger = trigger_watcher.wait(
+                    delay,
+                    poll_interval_seconds=args.trigger_check_seconds,
+                )
+                if woke_by_trigger:
+                    LOGGER.info("Bridge wake-up during backoff: trigger file updated")
     except Exception as exc:  # pragma: no cover - defensive entrypoint
         LOGGER.exception("Fatal bridge worker error: %s", exc)
         return 1

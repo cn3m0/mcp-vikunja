@@ -139,6 +139,7 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
 - optional queue notification hook via `BRIDGE_NOTIFY_COMMAND`
 - failed bridge comments are queued locally and retried (`BRIDGE_PENDING_COMMENTS_FILE`)
 - failed poll cycles use exponential backoff (`BRIDGE_BACKOFF_MIN_SECONDS` / `BRIDGE_BACKOFF_MAX_SECONDS`)
+- optional trigger-file wake-up (`BRIDGE_TRIGGER_FILE`) for near-real-time webhook nudges
 
 ## Prerequisites
 
@@ -237,6 +238,7 @@ Validation:
 - `make verify` (Vikunja workflow validation)
 - `make test-mcp` (MCP protocol + tool-call validation)
 - `make test-bridge` (bridge parser/unit checks)
+- `make test-webhook` (bridge webhook helper checks)
 - `make test-api` (Vikunja API helper unit checks)
 - `make bridge-once` (one bridge poll cycle, optional `BRIDGE_DRY_RUN=1`)
 - `make monitor` (quick health checks: compose + API + MCP port)
@@ -287,6 +289,9 @@ BRIDGE_PROJECT_IDS=13,14 BRIDGE_PROJECT_FILTERS_JSON='{"13":{"skip_done":true,"r
 # Continuous bridge worker via compose profile
 docker compose --profile bridge up -d --build bridge-worker
 
+# Optional webhook trigger service (nudges worker via trigger file)
+docker compose --profile webhook up -d --build bridge-webhook
+
 # Restrict processing to active execution buckets + size labels
 BRIDGE_PROJECT_ID=13 BRIDGE_ALLOWED_BUCKET_IDS=40,41 BRIDGE_REQUIRED_LABELS=size/s,size/m make bridge-once
 
@@ -331,6 +336,20 @@ Note:
   - `skip_done` (bool)
   - `allowed_bucket_ids` (array or comma string)
   - `required_labels` (array or comma string)
+- `BRIDGE_TRIGGER_FILE` lets external triggers wake the worker before poll interval expires.
+
+Webhook trigger example:
+
+```bash
+# Start webhook listener (profile "webhook")
+docker compose --profile webhook up -d --build bridge-webhook
+
+# Local test trigger
+curl -X POST "http://localhost:${BRIDGE_WEBHOOK_PORT:-8090}${BRIDGE_WEBHOOK_PATH:-/vikunja/webhook}" \
+  -H "X-Bridge-Webhook-Token: ${BRIDGE_WEBHOOK_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"event":"manual-test"}'
+```
 
 Action command example:
 
@@ -383,6 +402,12 @@ Main variables in `.env.example`:
 - `BRIDGE_PENDING_COMMENTS_MAX` (max retained queued bridge comments, default `500`)
 - `BRIDGE_BACKOFF_MIN_SECONDS` (retry backoff min delay for failed poll cycles)
 - `BRIDGE_BACKOFF_MAX_SECONDS` (retry backoff max delay for failed poll cycles)
+- `BRIDGE_TRIGGER_FILE` (optional file path used to wake worker immediately)
+- `BRIDGE_TRIGGER_CHECK_SECONDS` (poll interval while waiting for trigger updates)
+- `BRIDGE_WEBHOOK_PORT`
+- `BRIDGE_WEBHOOK_PATH`
+- `BRIDGE_WEBHOOK_TOKEN` (optional shared secret for webhook endpoint)
+- `BRIDGE_WEBHOOK_MAX_BODY_BYTES`
 
 ## Security
 
