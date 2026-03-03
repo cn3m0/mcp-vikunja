@@ -232,6 +232,10 @@ BRIDGE_PROJECT_ID=13 BRIDGE_DRY_RUN=1 make bridge-once
 
 # Continuous bridge worker via compose profile
 docker compose --profile bridge up -d --build bridge-worker
+
+# Direct python invocation (export .env first)
+set -a; source .env; set +a
+PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker --project-id 13 --once
 ```
 
 ## Environment Variables
