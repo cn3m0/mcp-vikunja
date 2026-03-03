@@ -83,6 +83,22 @@ def parse_mode_override(text: str) -> str | None:
     return match.group(1).lower()
 
 
+def parse_auto_move_buckets(
+    *,
+    ack_bucket_id: int | None,
+    done_bucket_id: int | None,
+    blocked_bucket_id: int | None,
+) -> dict[str, int]:
+    mapping: dict[str, int] = {}
+    if ack_bucket_id is not None:
+        mapping["ack"] = int(ack_bucket_id)
+    if done_bucket_id is not None:
+        mapping["done"] = int(done_bucket_id)
+    if blocked_bucket_id is not None:
+        mapping["blocked"] = int(blocked_bucket_id)
+    return mapping
+
+
 @dataclass
 class ActionCommand:
     action: str
@@ -195,6 +211,13 @@ def parse_optional_int(raw: str | None) -> int | None:
     try:
         return int(text)
     except ValueError:
+        return None
+
+
+def _as_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
         return None
 
 
@@ -504,6 +527,7 @@ class BridgeWorker:
         pending_comments_max: int = 500,
         allow_mode_comment_override: bool = False,
         project_filters: dict[int, dict[str, Any]] | None = None,
+        auto_move_buckets: dict[str, int] | None = None,
     ) -> None:
         self.client = client
         merged_project_ids = merge_project_ids(project_id, project_ids or [])
@@ -527,6 +551,7 @@ class BridgeWorker:
         self.pending_comments_max = max(int(pending_comments_max), 1)
         self.allow_mode_comment_override = allow_mode_comment_override
         self.project_filters = project_filters or {}
+        self.auto_move_buckets = auto_move_buckets or {}
 
     def _effective_project_filters(self, project_id: int) -> tuple[bool, set[int] | None, set[str] | None]:
         config = self.project_filters.get(project_id, {})
@@ -727,6 +752,7 @@ class BridgeWorker:
                 task_id,
                 f"ack: queued command={command_name} comment_id={comment_id} file={output_path}",
             )
+            self._maybe_auto_move_task(task=task, command_name=command_name)
             notify_error = self._notify_queue_event(
                 task=task,
                 comment_id=comment_id,
@@ -741,6 +767,39 @@ class BridgeWorker:
                 )
         except Exception as exc:  # pragma: no cover - top-level safety
             self._post_bridge_comment(task_id, f"blocked: could not queue command_id={comment_id} reason={exc}")
+
+    def _maybe_auto_move_task(self, *, task: dict[str, Any], command_name: str) -> None:
+        target_bucket_id = self.auto_move_buckets.get(command_name)
+        if target_bucket_id is None:
+            return
+
+        task_id = int(task["id"])
+        project_id = int(task.get("project_id", self.project_id))
+        current_bucket_id = _as_int(task.get("bucket_id"))
+        if current_bucket_id == target_bucket_id:
+            return
+
+        if self.dry_run:
+            LOGGER.info(
+                "Dry-run: auto-move task#%s command=%s bucket=%s",
+                task_id,
+                command_name,
+                target_bucket_id,
+            )
+            return
+
+        try:
+            self.client.move_task(task_id=task_id, target_bucket_id=target_bucket_id, project_id=project_id)
+            task["bucket_id"] = target_bucket_id
+            self._post_bridge_comment(
+                task_id,
+                f"update: auto-moved bucket={target_bucket_id} reason=command:{command_name}",
+            )
+        except Exception as exc:
+            self._post_bridge_comment(
+                task_id,
+                f"update: auto-move failed bucket={target_bucket_id} reason={exc}",
+            )
 
     def _handle_action_command(
         self,
@@ -1095,6 +1154,21 @@ def parse_args() -> argparse.Namespace:
         help="Allow task mode override from comments like `mode: ai|human`",
     )
     parser.add_argument(
+        "--auto-move-ack-bucket-id",
+        default=os.getenv("BRIDGE_AUTO_MOVE_ACK_BUCKET_ID", ""),
+        help="Optional bucket id to auto-move task after `ack:` command is queued",
+    )
+    parser.add_argument(
+        "--auto-move-done-bucket-id",
+        default=os.getenv("BRIDGE_AUTO_MOVE_DONE_BUCKET_ID", ""),
+        help="Optional bucket id to auto-move task after `done:` command is queued",
+    )
+    parser.add_argument(
+        "--auto-move-blocked-bucket-id",
+        default=os.getenv("BRIDGE_AUTO_MOVE_BLOCKED_BUCKET_ID", ""),
+        help="Optional bucket id to auto-move task after `blocked:` command is queued",
+    )
+    parser.add_argument(
         "--pending-comments-file",
         default=os.getenv("BRIDGE_PENDING_COMMENTS_FILE", ""),
         help="Optional JSONL file for bridge comments that failed to post",
@@ -1167,6 +1241,11 @@ def main() -> int:
             pending_comments_path=Path(args.pending_comments_file).expanduser() if args.pending_comments_file else None,
             pending_comments_max=args.pending_comments_max,
             project_filters=parse_project_filters(args.project_filters_json),
+            auto_move_buckets=parse_auto_move_buckets(
+                ack_bucket_id=parse_optional_int(args.auto_move_ack_bucket_id),
+                done_bucket_id=parse_optional_int(args.auto_move_done_bucket_id),
+                blocked_bucket_id=parse_optional_int(args.auto_move_blocked_bucket_id),
+            ),
         )
         if args.once:
             worker.run_once()

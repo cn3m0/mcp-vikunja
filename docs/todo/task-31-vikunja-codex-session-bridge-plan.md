@@ -230,6 +230,7 @@ If session binding invalid/missing:
 - Added per-project filter overrides (`BRIDGE_PROJECT_FILTERS_JSON` / `--project-filters-json`) for `skip_done`, `allowed_bucket_ids`, and `required_labels`.
 - Added optional webhook trigger service (`bridge_webhook`) that updates `BRIDGE_TRIGGER_FILE` to wake the pull worker immediately.
 - Added webhook allowlist filters (`BRIDGE_WEBHOOK_ALLOWED_EVENTS`, `BRIDGE_WEBHOOK_ALLOWED_PROJECT_IDS`) plus strict project-match option.
+- Added optional auto-bucket transitions for queued command comments (`ack`, `done`, `blocked`) via `BRIDGE_AUTO_MOVE_*_BUCKET_ID`.
 
 ## Open Questions
 

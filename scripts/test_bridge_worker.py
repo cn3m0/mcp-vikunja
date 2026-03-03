@@ -36,6 +36,7 @@ from vikunja_mcp.bridge_worker import (  # noqa: E402
     task_mode,
     latest_mode_override_from_comments,
     TriggerFileWatcher,
+    parse_auto_move_buckets,
 )
 from vikunja_mcp.vikunja_api import VikunjaClient  # noqa: E402
 
@@ -121,6 +122,11 @@ def main() -> int:
     assert_equal(parse_mode_override("mode: ai"), "ai", "mode override parse failed")
     assert_equal(parse_mode_override("mode: HUMAN"), "human", "mode override parse uppercase failed")
     assert_equal(parse_mode_override("mode: invalid"), None, "invalid mode override should be ignored")
+    assert_equal(
+        parse_auto_move_buckets(ack_bucket_id=40, done_bucket_id=41, blocked_bucket_id=None),
+        {"ack": 40, "done": 41},
+        "auto move bucket mapping parse failed",
+    )
 
     # parse_action_command + confirmation
     action = parse_action_command("action: move bucket=40 id=mv-001")
@@ -340,6 +346,25 @@ def main() -> int:
     assert_equal(notify_file.exists(), True, "notify file should be created")
     assert_equal(notify_file.read_text(encoding="utf-8"), "125:update:77", "notify command output mismatch")
     notify_file.unlink(missing_ok=True)
+
+    # queue command may auto-move task by command type
+    fake_auto_move = FakeClient()
+    worker_auto_move = BridgeWorker(
+        client=fake_auto_move,  # type: ignore[arg-type]
+        project_id=13,
+        state_path=Path("/tmp/test-bridge-worker-state-auto-move.json"),
+        dry_run=False,
+        auto_move_buckets={"done": 41},
+    )
+    with tempfile.TemporaryDirectory(prefix="bridge-auto-move-test-") as tmpdir:
+        worker_auto_move._handle_queue_command(
+            task={"id": 126, "project_id": 13, "title": "Auto Move Demo", "bucket_id": 40},
+            comment_id=78,
+            command_name="done",
+            command_body="ship it",
+            binding={"node": "np1", "session": "s", "workdir": tmpdir},
+        )
+    assert_equal(fake_auto_move.moves, [(126, 41, 13)], "done command should auto-move task")
 
     # failed comment posting should spool and later flush pending comments
     with tempfile.TemporaryDirectory(prefix="bridge-pending-comments-") as tmpdir:

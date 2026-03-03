@@ -140,6 +140,7 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
 - failed bridge comments are queued locally and retried (`BRIDGE_PENDING_COMMENTS_FILE`)
 - failed poll cycles use exponential backoff (`BRIDGE_BACKOFF_MIN_SECONDS` / `BRIDGE_BACKOFF_MAX_SECONDS`)
 - optional trigger-file wake-up (`BRIDGE_TRIGGER_FILE`) for near-real-time webhook nudges
+- optional auto bucket transitions after queued commands (`ack` / `done` / `blocked`)
 
 ## Prerequisites
 
@@ -302,6 +303,9 @@ BRIDGE_PROJECT_ID=13 BRIDGE_ALLOWED_BUCKET_IDS=40,41 BRIDGE_REQUIRED_LABELS=size
 # Allow task-level mode override from comments (`mode: ai|human`)
 BRIDGE_ALLOW_MODE_COMMENT_OVERRIDE=true BRIDGE_PROJECT_ID=13 make bridge-once
 
+# Optional auto transitions after queueing commands
+BRIDGE_AUTO_MOVE_ACK_BUCKET_ID=40 BRIDGE_AUTO_MOVE_DONE_BUCKET_ID=41 BRIDGE_AUTO_MOVE_BLOCKED_BUCKET_ID=48 BRIDGE_PROJECT_ID=13 make bridge-once
+
 # Continuous worker retry tuning + pending-comment spool path
 BRIDGE_BACKOFF_MIN_SECONDS=5 BRIDGE_BACKOFF_MAX_SECONDS=120 BRIDGE_PENDING_COMMENTS_FILE=/var/lib/vikunja-bridge/pending-comments.jsonl docker compose --profile bridge up -d --build bridge-worker
 
@@ -341,6 +345,10 @@ Note:
   - `allowed_bucket_ids` (array or comma string)
   - `required_labels` (array or comma string)
 - `BRIDGE_TRIGGER_FILE` lets external triggers wake the worker before poll interval expires.
+- `BRIDGE_AUTO_MOVE_*_BUCKET_ID` auto-moves tasks after queueing command comments:
+  - `BRIDGE_AUTO_MOVE_ACK_BUCKET_ID`
+  - `BRIDGE_AUTO_MOVE_DONE_BUCKET_ID`
+  - `BRIDGE_AUTO_MOVE_BLOCKED_BUCKET_ID`
 
 Webhook trigger example:
 
@@ -407,6 +415,9 @@ Main variables in `.env.example`:
 - `BRIDGE_SKIP_DONE` (default `true`, skip tasks where `done=true`)
 - `BRIDGE_ALLOWED_BUCKET_IDS` (optional comma-separated bucket IDs to include)
 - `BRIDGE_REQUIRED_LABELS` (optional comma-separated labels, at least one must match)
+- `BRIDGE_AUTO_MOVE_ACK_BUCKET_ID` (optional target bucket after `ack:` queueing)
+- `BRIDGE_AUTO_MOVE_DONE_BUCKET_ID` (optional target bucket after `done:` queueing)
+- `BRIDGE_AUTO_MOVE_BLOCKED_BUCKET_ID` (optional target bucket after `blocked:` queueing)
 - `BRIDGE_PENDING_COMMENTS_FILE` (optional JSONL spool for bridge comments that could not be posted)
 - `BRIDGE_PENDING_COMMENTS_MAX` (max retained queued bridge comments, default `500`)
 - `BRIDGE_BACKOFF_MIN_SECONDS` (retry backoff min delay for failed poll cycles)

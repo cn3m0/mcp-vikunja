@@ -70,6 +70,9 @@ bridge-once:
 	  --mode-file "$${BRIDGE_MODE_FILE:-}" \
 	  --allowed-bucket-ids "$${BRIDGE_ALLOWED_BUCKET_IDS:-}" \
 	  --required-labels "$${BRIDGE_REQUIRED_LABELS:-}" \
+	  --auto-move-ack-bucket-id "$${BRIDGE_AUTO_MOVE_ACK_BUCKET_ID:-}" \
+	  --auto-move-done-bucket-id "$${BRIDGE_AUTO_MOVE_DONE_BUCKET_ID:-}" \
+	  --auto-move-blocked-bucket-id "$${BRIDGE_AUTO_MOVE_BLOCKED_BUCKET_ID:-}" \
 	  --pending-comments-file "$${BRIDGE_PENDING_COMMENTS_FILE:-}" \
 	  --pending-comments-max "$${BRIDGE_PENDING_COMMENTS_MAX:-500}" \
 	  --once $$EXTRA
