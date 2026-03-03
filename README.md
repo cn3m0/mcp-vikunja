@@ -353,6 +353,11 @@ curl -X POST "http://localhost:${BRIDGE_WEBHOOK_PORT:-8090}${BRIDGE_WEBHOOK_PATH
   -H "X-Bridge-Webhook-Token: ${BRIDGE_WEBHOOK_TOKEN}" \
   -H "Content-Type: application/json" \
   -d '{"event":"manual-test"}'
+
+# Optional webhook filtering (reduce noisy triggers)
+export BRIDGE_WEBHOOK_ALLOWED_EVENTS=task.created,task.updated
+export BRIDGE_WEBHOOK_ALLOWED_PROJECT_IDS=13,14
+export BRIDGE_WEBHOOK_REQUIRE_PROJECT_MATCH=true
 ```
 
 Action command example:
@@ -412,6 +417,9 @@ Main variables in `.env.example`:
 - `BRIDGE_WEBHOOK_PATH`
 - `BRIDGE_WEBHOOK_TOKEN` (optional shared secret for webhook endpoint)
 - `BRIDGE_WEBHOOK_MAX_BODY_BYTES`
+- `BRIDGE_WEBHOOK_ALLOWED_EVENTS` (optional comma-separated event allowlist)
+- `BRIDGE_WEBHOOK_ALLOWED_PROJECT_IDS` (optional comma-separated project-id allowlist)
+- `BRIDGE_WEBHOOK_REQUIRE_PROJECT_MATCH` (default `false`; reject webhook when project id cannot be detected while allowlist is set)
 - `BRIDGE_WEBHOOK_MONITOR` (default `false`; include webhook checks in monitor stack)
 - `BRIDGE_WEBHOOK_HEALTH_URL` (default `http://localhost:8090/healthz`)
 

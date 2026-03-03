@@ -155,6 +155,9 @@ services:
       BRIDGE_WEBHOOK_PATH: ${BRIDGE_WEBHOOK_PATH:-/vikunja/webhook}
       BRIDGE_WEBHOOK_TOKEN: ${BRIDGE_WEBHOOK_TOKEN:-}
       BRIDGE_WEBHOOK_MAX_BODY_BYTES: ${BRIDGE_WEBHOOK_MAX_BODY_BYTES:-1048576}
+      BRIDGE_WEBHOOK_ALLOWED_EVENTS: ${BRIDGE_WEBHOOK_ALLOWED_EVENTS:-}
+      BRIDGE_WEBHOOK_ALLOWED_PROJECT_IDS: ${BRIDGE_WEBHOOK_ALLOWED_PROJECT_IDS:-}
+      BRIDGE_WEBHOOK_REQUIRE_PROJECT_MATCH: ${BRIDGE_WEBHOOK_REQUIRE_PROJECT_MATCH:-false}
       BRIDGE_TRIGGER_FILE: ${BRIDGE_TRIGGER_FILE:-/var/lib/vikunja-bridge/trigger.signal}
       LOG_LEVEL: INFO
     command:
@@ -174,6 +177,12 @@ services:
         "${BRIDGE_TRIGGER_FILE:-/var/lib/vikunja-bridge/trigger.signal}",
         "--max-body-bytes",
         "${BRIDGE_WEBHOOK_MAX_BODY_BYTES:-1048576}",
+        "--allowed-events",
+        "${BRIDGE_WEBHOOK_ALLOWED_EVENTS:-}",
+        "--allowed-project-ids",
+        "${BRIDGE_WEBHOOK_ALLOWED_PROJECT_IDS:-}",
+        "--require-project-match",
+        "${BRIDGE_WEBHOOK_REQUIRE_PROJECT_MATCH:-false}",
       ]
     ports:
       - "${BRIDGE_WEBHOOK_PORT:-8090}:${BRIDGE_WEBHOOK_PORT:-8090}"
