@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MCP_ADAPTER_PATH = ROOT / "mcp_adapter"
 sys.path.insert(0, str(MCP_ADAPTER_PATH))
 
+import vikunja_mcp.vikunja_api as vikunja_api  # noqa: E402
 from vikunja_mcp.vikunja_api import VikunjaClient  # noqa: E402
 
 
@@ -55,13 +56,24 @@ def main() -> int:
         "non-markdown escaped newline should remain unchanged",
     )
 
+    # markdown/html preparation
+    assert_equal(
+        VikunjaClient.prepare_comment_for_vikunja("<p>already html</p>"),
+        "<p>already html</p>",
+        "html input should stay unchanged",
+    )
+
     # add_task_comment should send normalized body
     fake = FakeVikunjaClient()
+    original_renderer = vikunja_api._markdown_to_html
+    vikunja_api._markdown_to_html = lambda text, extensions=None, output_format=None: f"<p>{text}</p>"  # type: ignore[assignment]
     fake.add_task_comment(task_id=64, comment="Update:\\n- bullet 1\\n- bullet 2")
+    vikunja_api._markdown_to_html = original_renderer
+
     assert_equal(
         (fake.last_json or {}).get("comment"),
-        "Update:\n- bullet 1\n- bullet 2",
-        "request payload comment normalization failed",
+        "<p>Update:\n- bullet 1\n- bullet 2</p>",
+        "request payload comment rendering failed",
     )
 
     print("[OK] vikunja api checks passed")

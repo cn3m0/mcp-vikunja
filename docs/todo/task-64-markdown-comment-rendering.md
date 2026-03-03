@@ -27,6 +27,11 @@ Goal:
     - `\\n\\n`, `\\n- `, `\\n* `, `\\n# `, `\\n> `, `\\n````, `\\n1. ` ...
   - Avoid broad decoding to reduce false positives (for example paths like `C:\\new\\node`).
 
+- Added rendering stage in `VikunjaClient.prepare_comment_for_vikunja()`:
+  - If payload already looks like HTML, keep it unchanged.
+  - Otherwise render markdown to HTML before posting (`markdown` package).
+  - This aligns MCP comments with Vikunja's rich-text UI rendering path.
+
 ## Verification
 
 - Unit tests:

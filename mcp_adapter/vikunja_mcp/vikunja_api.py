@@ -2,10 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import re
 from typing import Any
 import urllib.error
 import urllib.parse
 import urllib.request
+
+try:
+    from markdown import markdown as _markdown_to_html
+except Exception:  # pragma: no cover - optional dependency at runtime
+    _markdown_to_html = None
+
+
+HTML_TAG_PATTERN = re.compile(r"<[a-zA-Z][^>]*>")
 
 
 @dataclass
@@ -215,8 +224,27 @@ class VikunjaClient:
             text = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
         return text
 
+    @staticmethod
+    def prepare_comment_for_vikunja(comment: str) -> str:
+        text = VikunjaClient.normalize_comment_text(comment)
+        if not text:
+            return text
+
+        # Keep caller-provided html untouched.
+        if HTML_TAG_PATTERN.search(text):
+            return text
+
+        if _markdown_to_html is None:
+            return text
+
+        return _markdown_to_html(
+            text,
+            extensions=["fenced_code", "sane_lists", "nl2br"],
+            output_format="html5",
+        )
+
     def add_task_comment(self, task_id: int, comment: str) -> dict[str, Any]:
-        body = {"comment": self.normalize_comment_text(comment)}
+        body = {"comment": self.prepare_comment_for_vikunja(comment)}
         payload = self._request(
             "PUT",
             f"/tasks/{task_id}/comments",
