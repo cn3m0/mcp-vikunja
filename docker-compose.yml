@@ -78,6 +78,7 @@ services:
       VIKUNJA_API_TOKEN: ${VIKUNJA_API_TOKEN}
       VIKUNJA_TIMEOUT: "15"
       BRIDGE_PROJECT_IDS: ${BRIDGE_PROJECT_IDS:-}
+      BRIDGE_PROJECT_FILTERS_JSON: ${BRIDGE_PROJECT_FILTERS_JSON:-}
       BRIDGE_POLL_INTERVAL: ${BRIDGE_POLL_INTERVAL:-15}
       BRIDGE_CONFIRM_TTL_HOURS: ${BRIDGE_CONFIRM_TTL_HOURS:-24}
       BRIDGE_CONFIRM_ALLOWED_USERS: ${BRIDGE_CONFIRM_ALLOWED_USERS:-}
@@ -102,6 +103,8 @@ services:
         "${BRIDGE_PROJECT_ID:-13}",
         "--project-ids",
         "${BRIDGE_PROJECT_IDS:-}",
+        "--project-filters-json",
+        "${BRIDGE_PROJECT_FILTERS_JSON:-}",
         "--state-file",
         "${BRIDGE_STATE_FILE:-/var/lib/vikunja-bridge/state.json}",
         "--interval",

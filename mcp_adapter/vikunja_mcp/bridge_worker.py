@@ -174,6 +174,79 @@ def merge_project_ids(project_id: int | None, project_ids: list[int]) -> list[in
     return values
 
 
+def _parse_int_set_any(raw: Any) -> set[int] | None:
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return parse_int_set(raw)
+    if isinstance(raw, list):
+        values: set[int] = set()
+        for item in raw:
+            try:
+                values.add(int(item))
+            except (TypeError, ValueError):
+                continue
+        if not values:
+            return None
+        return values
+    return None
+
+
+def _parse_lower_set_any(raw: Any) -> set[str] | None:
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return parse_lower_set(raw)
+    if isinstance(raw, list):
+        values = {str(item).strip().lower() for item in raw if str(item).strip()}
+        if not values:
+            return None
+        return values
+    return None
+
+
+def parse_project_filters(raw: str | None) -> dict[int, dict[str, Any]]:
+    if raw is None or not raw.strip():
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        LOGGER.warning("Invalid BRIDGE_PROJECT_FILTERS_JSON, ignoring")
+        return {}
+
+    if not isinstance(payload, dict):
+        LOGGER.warning("BRIDGE_PROJECT_FILTERS_JSON must be a JSON object, ignoring")
+        return {}
+
+    rules: dict[int, dict[str, Any]] = {}
+    for project_key, config in payload.items():
+        try:
+            project_id = int(str(project_key))
+        except ValueError:
+            continue
+        if not isinstance(config, dict):
+            continue
+
+        rule: dict[str, Any] = {}
+        if "skip_done" in config:
+            value = config.get("skip_done")
+            if isinstance(value, bool):
+                rule["skip_done"] = value
+            elif isinstance(value, str):
+                rule["skip_done"] = parse_bool(value, default=False)
+
+        if "allowed_bucket_ids" in config:
+            rule["allowed_bucket_ids"] = _parse_int_set_any(config.get("allowed_bucket_ids"))
+
+        if "required_labels" in config:
+            rule["required_labels"] = _parse_lower_set_any(config.get("required_labels"))
+
+        if rule:
+            rules[project_id] = rule
+
+    return rules
+
+
 def parse_bool(raw: str | None, default: bool = False) -> bool:
     if raw is None:
         return default
@@ -392,6 +465,7 @@ class BridgeWorker:
         pending_comments_path: Path | None = None,
         pending_comments_max: int = 500,
         allow_mode_comment_override: bool = False,
+        project_filters: dict[int, dict[str, Any]] | None = None,
     ) -> None:
         self.client = client
         merged_project_ids = merge_project_ids(project_id, project_ids or [])
@@ -414,6 +488,21 @@ class BridgeWorker:
         self.pending_comments_path = pending_comments_path
         self.pending_comments_max = max(int(pending_comments_max), 1)
         self.allow_mode_comment_override = allow_mode_comment_override
+        self.project_filters = project_filters or {}
+
+    def _effective_project_filters(self, project_id: int) -> tuple[bool, set[int] | None, set[str] | None]:
+        config = self.project_filters.get(project_id, {})
+        skip_done = bool(config.get("skip_done", self.skip_done))
+        if "allowed_bucket_ids" in config:
+            allowed_bucket_ids = config.get("allowed_bucket_ids")
+        else:
+            allowed_bucket_ids = self.allowed_bucket_ids
+
+        if "required_labels" in config:
+            required_labels = config.get("required_labels")
+        else:
+            required_labels = self.required_labels
+        return skip_done, allowed_bucket_ids, required_labels
 
     def run_once(self) -> None:
         self._flush_pending_bridge_comments(limit=50)
@@ -429,7 +518,17 @@ class BridgeWorker:
 
         for project_id in self.project_ids:
             tasks = self.client.list_tasks(project_id=project_id, page=1, per_page=300)
+            project_skip_done, project_allowed_bucket_ids, project_required_labels = self._effective_project_filters(
+                project_id
+            )
             LOGGER.info("Found %d tasks in project %s", len(tasks), project_id)
+            LOGGER.info(
+                "Project %s filters: skip_done=%s allowed_bucket_ids=%s required_labels=%s",
+                project_id,
+                project_skip_done,
+                sorted(project_allowed_bucket_ids) if project_allowed_bucket_ids is not None else None,
+                sorted(project_required_labels) if project_required_labels is not None else None,
+            )
 
             for task in sorted(tasks, key=lambda t: int(t.get("id", 0))):
                 comments = self.client.list_task_comments(task_id=int(task["id"]), order_by="asc")
@@ -440,9 +539,9 @@ class BridgeWorker:
                 allowed, reason = should_process_task(
                     task,
                     mode=mode,
-                    skip_done=self.skip_done,
-                    allowed_bucket_ids=self.allowed_bucket_ids,
-                    required_labels=self.required_labels,
+                    skip_done=project_skip_done,
+                    allowed_bucket_ids=project_allowed_bucket_ids,
+                    required_labels=project_required_labels,
                 )
                 if not allowed:
                     if reason == "mode":
@@ -892,6 +991,14 @@ def parse_args() -> argparse.Namespace:
         help="Optional comma-separated Vikunja project ids to poll in one cycle",
     )
     parser.add_argument(
+        "--project-filters-json",
+        default=os.getenv("BRIDGE_PROJECT_FILTERS_JSON", ""),
+        help=(
+            "Optional JSON object with per-project filter overrides, "
+            'for example {"13":{"skip_done":false,"allowed_bucket_ids":[40],"required_labels":["size/s"]}}'
+        ),
+    )
+    parser.add_argument(
         "--state-file",
         default=os.getenv("BRIDGE_STATE_FILE", "/tmp/mcp-vikunja-bridge/state.json"),
         help="Persistent state file path",
@@ -1007,6 +1114,7 @@ def main() -> int:
             allow_mode_comment_override=bool(args.allow_mode_comment_override),
             pending_comments_path=Path(args.pending_comments_file).expanduser() if args.pending_comments_file else None,
             pending_comments_max=args.pending_comments_max,
+            project_filters=parse_project_filters(args.project_filters_json),
         )
         if args.once:
             worker.run_once()

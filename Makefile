@@ -11,7 +11,7 @@ help:
 	@echo "  make test-mcp   - Run MCP streamable-http smoke test"
 	@echo "  make test-bridge - Run bridge worker parser/unit checks"
 	@echo "  make test-api   - Run Vikunja API helper unit checks"
-	@echo "  make bridge-once - Run one bridge poll cycle (set BRIDGE_PROJECT_ID or BRIDGE_PROJECT_IDS, optional BRIDGE_DRY_RUN=1)"
+	@echo "  make bridge-once - Run one bridge poll cycle (set BRIDGE_PROJECT_ID/BRIDGE_PROJECT_IDS, optional BRIDGE_DRY_RUN=1)"
 	@echo "  make monitor    - Quick local stack health checks"
 	@echo "  make monitor-full - Health checks + verify/test-mcp smoke"
 	@echo "  make watchdog-once - Run one watchdog cycle and write status json"
@@ -56,6 +56,7 @@ bridge-once:
 	PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker \
 	  --project-id "$$PROJECT_ID" \
 	  --project-ids "$${BRIDGE_PROJECT_IDS:-}" \
+	  --project-filters-json "$${BRIDGE_PROJECT_FILTERS_JSON:-}" \
 	  --state-file "$${BRIDGE_STATE_FILE:-/tmp/mcp-vikunja-bridge/state.json}" \
 	  --confirm-ttl-hours "$${BRIDGE_CONFIRM_TTL_HOURS:-24}" \
 	  --confirm-allowed-users "$${BRIDGE_CONFIRM_ALLOWED_USERS:-}" \

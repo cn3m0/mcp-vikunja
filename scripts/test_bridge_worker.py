@@ -25,6 +25,7 @@ from vikunja_mcp.bridge_worker import (  # noqa: E402
     parse_int_set,
     parse_int_list,
     parse_mode_override,
+    parse_project_filters,
     parse_lower_set,
     merge_project_ids,
     parse_mode_value,
@@ -157,6 +158,13 @@ def main() -> int:
     assert_equal(parse_int_list("13, 14, x,13"), [13, 14], "int list parse failed")
     assert_equal(merge_project_ids(12, [13, 12, 14]), [12, 13, 14], "merge project ids failed")
     assert_equal(merge_project_ids(None, [13, 13]), [13], "merge project ids with none failed")
+    project_filters = parse_project_filters(
+        '{"13":{"skip_done":false,"allowed_bucket_ids":[40,41],"required_labels":["size/S","size/M"]},"14":{"allowed_bucket_ids":[]}}'
+    )
+    assert_equal(project_filters[13]["skip_done"], False, "project filter skip_done parse failed")
+    assert_equal(project_filters[13]["allowed_bucket_ids"], {40, 41}, "project filter bucket parse failed")
+    assert_equal(project_filters[13]["required_labels"], {"size/s", "size/m"}, "project filter labels parse failed")
+    assert_equal(project_filters[14]["allowed_bucket_ids"], None, "empty bucket override should disable bucket filter")
     assert_equal(parse_int_set(""), None, "empty int set should be None")
     assert_equal(parse_bool("yes"), True, "bool yes parse failed")
     assert_equal(parse_bool("0", default=True), False, "bool false parse failed")
@@ -353,6 +361,24 @@ def main() -> int:
         )
         multi_worker.run_once()
         assert_equal(multi_client.projects_listed, [13, 14], "multi-project polling order mismatch")
+
+    # per-project skip_done override should select done tasks only for configured projects
+    with tempfile.TemporaryDirectory(prefix="bridge-project-filters-") as tmpdir:
+        multi_client_filters = FakeMultiProjectClient()
+        state_file = Path(tmpdir) / "state.json"
+        multi_worker_filters = BridgeWorker(
+            client=multi_client_filters,  # type: ignore[arg-type]
+            project_id=None,
+            project_ids=[13, 14],
+            state_path=state_file,
+            dry_run=True,
+            skip_done=True,
+            project_filters={14: {"skip_done": False}},
+        )
+        multi_worker_filters.run_once()
+        state_payload = multi_worker_filters.state._data.get("tasks", {})
+        assert_equal("14001" in state_payload, True, "project-level skip_done override should allow project 14 task")
+        assert_equal("13001" in state_payload, False, "project 13 should still skip done task")
 
     # list_tasks should flatten bucket payload even if first bucket has no `tasks` key
     bucket_payload = [
