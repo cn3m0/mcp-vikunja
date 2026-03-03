@@ -61,3 +61,11 @@ Recommended minimum:
 - Added Make targets:
   - `make monitor`
   - `make monitor-full`
+- Added `scripts/watchdog_loop.py` with:
+  - periodic monitor execution (`monitor_stack.py --json`)
+  - optional periodic full-smoke cycles (`--full-every`)
+  - atomic status snapshot output (`/tmp/mcp-vikunja-watchdog/status.json` by default)
+  - optional failure callback (`--notify-command`)
+- Added Make targets:
+  - `make watchdog-once`
+  - `make watchdog-loop`

@@ -229,6 +229,8 @@ Validation:
 - `make bridge-once` (one bridge poll cycle, optional `BRIDGE_DRY_RUN=1`)
 - `make monitor` (quick health checks: compose + API + MCP port)
 - `make monitor-full` (monitor + verify + test-mcp smoke)
+- `make watchdog-once` (single watchdog cycle + status snapshot)
+- `make watchdog-loop` (continuous monitoring loop)
 - `make backup-drill` (SQL backup + restore drill in temporary DB)
 - `make full-check` (verify + test-mcp)
 - `make publish-check` (static publish checks)
@@ -242,8 +244,17 @@ make monitor
 # Full smoke check
 make monitor-full
 
+# One watchdog cycle (writes /tmp/mcp-vikunja-watchdog/status.json)
+make watchdog-once
+
+# Continuous watchdog loop (Ctrl+C to stop)
+make watchdog-loop
+
 # Alert integration (example: ntfy) when any check fails
 python3 scripts/monitor_stack.py --alert-command 'ntfy publish ops-alerts "mcp-vikunja FAIL: {summary}"'
+
+# Watchdog with failure notification callback
+python3 scripts/watchdog_loop.py --notify-command 'ntfy publish ops-alerts "watchdog FAIL: {summary}"'
 
 # Weekly backup/restore drill with JSON evidence
 python3 scripts/backup_restore_drill.py --report-file /tmp/mcp-vikunja-backups/latest-drill.json
