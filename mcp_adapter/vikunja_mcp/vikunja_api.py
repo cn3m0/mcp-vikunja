@@ -204,6 +204,14 @@ class VikunjaClient:
             raise VikunjaApiError("Unexpected response type while fetching task", details=payload)
         return payload
 
+    def update_task(self, task_id: int, updates: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(updates, dict) or not updates:
+            raise VikunjaApiError("Task update payload must be a non-empty object")
+        payload = self._request("POST", f"/tasks/{task_id}", json_data=updates)
+        if not isinstance(payload, dict):
+            raise VikunjaApiError("Unexpected response type while updating task", details=payload)
+        return payload
+
     def move_task(
         self,
         task_id: int,

@@ -46,3 +46,15 @@ For each drill record:
 
 - Drill can be executed without touching production DB.
 - Verification output is captured and traceable.
+
+## Implementation Note (2026-03-03)
+
+- Added `scripts/backup_restore_drill.py`:
+  - creates SQL dump from `db` container
+  - computes SHA256 and file size
+  - restores into temporary drill DB
+  - validates counts for `projects`, `tasks`, `task_comments`
+  - drops temporary DB by default (optional keep flag)
+  - supports JSON evidence output via `--report-file`
+- Added Make target:
+  - `make backup-drill`

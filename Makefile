@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help onboard up bootstrap verify test-mcp test-bridge bridge-once full-check publish-check logs ps down clean
+.PHONY: help onboard up bootstrap verify test-mcp test-bridge bridge-once monitor monitor-full backup-drill full-check publish-check logs ps down clean
 
 help:
 	@echo "Available targets:"
@@ -11,6 +11,9 @@ help:
 	@echo "  make test-mcp   - Run MCP streamable-http smoke test"
 	@echo "  make test-bridge - Run bridge worker parser/unit checks"
 	@echo "  make bridge-once - Run one bridge poll cycle (set BRIDGE_PROJECT_ID, optional BRIDGE_DRY_RUN=1)"
+	@echo "  make monitor    - Quick local stack health checks"
+	@echo "  make monitor-full - Health checks + verify/test-mcp smoke"
+	@echo "  make backup-drill - Create SQL backup and run restore drill"
 	@echo "  make full-check - Run verify and MCP smoke test"
 	@echo "  make publish-check - Run static checks for GitHub publishing"
 	@echo "  make logs       - Follow service logs"
@@ -48,7 +51,17 @@ bridge-once:
 	  --project-id "$$PROJECT_ID" \
 	  --state-file "$${BRIDGE_STATE_FILE:-/tmp/mcp-vikunja-bridge/state.json}" \
 	  --confirm-ttl-hours "$${BRIDGE_CONFIRM_TTL_HOURS:-24}" \
+	  --confirm-allowed-users "$${BRIDGE_CONFIRM_ALLOWED_USERS:-}" \
 	  --once $$EXTRA
+
+monitor:
+	python3 scripts/monitor_stack.py
+
+monitor-full:
+	python3 scripts/monitor_stack.py --full
+
+backup-drill:
+	python3 scripts/backup_restore_drill.py
 
 full-check: verify test-mcp
 

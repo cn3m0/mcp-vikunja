@@ -125,6 +125,8 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
 - level-2 action policy with explicit confirmations:
   - `confirm: <action-id>`
   - `action: move bucket=<id> id=<action-id>`
+  - `action: reopen bucket=<id> id=<action-id>`
+  - optional confirmer allowlist via `BRIDGE_CONFIRM_ALLOWED_USERS`
 
 ## Prerequisites
 
@@ -224,8 +226,27 @@ Validation:
 - `make test-mcp` (MCP protocol + tool-call validation)
 - `make test-bridge` (bridge parser/unit checks)
 - `make bridge-once` (one bridge poll cycle, optional `BRIDGE_DRY_RUN=1`)
+- `make monitor` (quick health checks: compose + API + MCP port)
+- `make monitor-full` (monitor + verify + test-mcp smoke)
+- `make backup-drill` (SQL backup + restore drill in temporary DB)
 - `make full-check` (verify + test-mcp)
 - `make publish-check` (static publish checks)
+
+Monitoring + backup drill examples:
+
+```bash
+# Quick status (non-destructive)
+make monitor
+
+# Full smoke check
+make monitor-full
+
+# Alert integration (example: ntfy) when any check fails
+python3 scripts/monitor_stack.py --alert-command 'ntfy publish ops-alerts "mcp-vikunja FAIL: {summary}"'
+
+# Weekly backup/restore drill with JSON evidence
+python3 scripts/backup_restore_drill.py --report-file /tmp/mcp-vikunja-backups/latest-drill.json
+```
 
 Bridge worker run options:
 
@@ -246,12 +267,16 @@ Action command example:
 ```text
 confirm: move-to-doing-001
 action: move bucket=40 id=move-to-doing-001
+
+confirm: reopen-task-001
+action: reopen bucket=39 id=reopen-task-001
 ```
 
 The action is executed only if:
 - task is labeled `mode/ai`
 - valid `[bind]` block exists
 - confirmation token exists, is unexpired, and unused
+- optional confirmer allowlist check passes (`BRIDGE_CONFIRM_ALLOWED_USERS`)
 
 ## Environment Variables
 
@@ -269,10 +294,12 @@ Main variables in `.env.example`:
 - `VIKUNJA_ADMIN_PASSWORD`
 - `VIKUNJA_API_TOKEN_TITLE`
 - `VIKUNJA_API_TOKEN`
+- `MCP_URL` (optional, default `http://localhost:8000/mcp`)
 - `BRIDGE_PROJECT_ID`
 - `BRIDGE_POLL_INTERVAL`
 - `BRIDGE_STATE_FILE`
 - `BRIDGE_CONFIRM_TTL_HOURS`
+- `BRIDGE_CONFIRM_ALLOWED_USERS` (comma-separated usernames, optional)
 
 ## Security
 
