@@ -24,13 +24,16 @@ from vikunja_mcp.bridge_worker import (  # noqa: E402
     parse_confirmation_token,
     parse_int_set,
     parse_int_list,
+    parse_mode_override,
     parse_lower_set,
     merge_project_ids,
     parse_mode_value,
     read_mode_file,
     render_notify_command,
     should_process_task,
+    task_mode_with_override,
     task_mode,
+    latest_mode_override_from_comments,
 )
 from vikunja_mcp.vikunja_api import VikunjaClient  # noqa: E402
 
@@ -111,6 +114,9 @@ def main() -> int:
     assert_equal(parse_command("ack: started"), ("ack", "started"), "ack command parse failed")
     assert_equal(parse_command("update: value"), ("update", "value"), "update command parse failed")
     assert_equal(parse_command("not-a-command"), None, "invalid command should be ignored")
+    assert_equal(parse_mode_override("mode: ai"), "ai", "mode override parse failed")
+    assert_equal(parse_mode_override("mode: HUMAN"), "human", "mode override parse uppercase failed")
+    assert_equal(parse_mode_override("mode: invalid"), None, "invalid mode override should be ignored")
 
     # parse_action_command + confirmation
     action = parse_action_command("action: move bucket=40 id=mv-001")
@@ -180,10 +186,21 @@ def main() -> int:
     mode_human_label = task_mode({"labels": [{"title": "mode/human"}]}, fallback_mode="ai")
     mode_ai_fallback = task_mode({"labels": []}, fallback_mode="ai")
     mode_human = task_mode({"labels": [{"title": "other"}]})
+    mode_override = task_mode_with_override({"labels": [{"title": "mode/human"}]}, comment_override="ai")
     assert_equal(mode_ai, "ai", "mode/ai resolution failed")
     assert_equal(mode_human_label, "human", "mode/human label must override fallback")
     assert_equal(mode_ai_fallback, "ai", "fallback mode file should allow ai mode without label")
     assert_equal(mode_human, "human", "default mode should be human")
+    assert_equal(mode_override, "ai", "comment override should take precedence when enabled")
+
+    override_from_comments = latest_mode_override_from_comments(
+        [
+            {"id": 1, "comment": "mode: human"},
+            {"id": 2, "comment": "[bridge] mode: ai"},
+            {"id": 3, "comment": "mode: ai"},
+        ]
+    )
+    assert_equal(override_from_comments, "ai", "latest non-bridge mode override should win")
 
     allowed, reason = should_process_task(
         {"id": 1, "done": False, "bucket_id": 40, "labels": [{"title": "mode/ai"}, {"title": "size/M"}]},

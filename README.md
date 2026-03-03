@@ -125,6 +125,7 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
   - `BRIDGE_ALLOWED_BUCKET_IDS=40,41`
   - `BRIDGE_REQUIRED_LABELS=size/s,size/m`
 - optional multi-project polling via `BRIDGE_PROJECT_IDS=13,14`
+- optional task-level mode override via comments (`mode: ai` / `mode: human`) when enabled
 - `[bind]...[/bind]` parsing (`node`, `session`, `workdir`)
 - idempotent state watermark (`last_processed_comment_id`)
 - bridge comment prefix protection (`[bridge]`)
@@ -285,6 +286,9 @@ docker compose --profile bridge up -d --build bridge-worker
 # Restrict processing to active execution buckets + size labels
 BRIDGE_PROJECT_ID=13 BRIDGE_ALLOWED_BUCKET_IDS=40,41 BRIDGE_REQUIRED_LABELS=size/s,size/m make bridge-once
 
+# Allow task-level mode override from comments (`mode: ai|human`)
+BRIDGE_ALLOW_MODE_COMMENT_OVERRIDE=true BRIDGE_PROJECT_ID=13 make bridge-once
+
 # Continuous worker retry tuning + pending-comment spool path
 BRIDGE_BACKOFF_MIN_SECONDS=5 BRIDGE_BACKOFF_MAX_SECONDS=120 BRIDGE_PENDING_COMMENTS_FILE=/var/lib/vikunja-bridge/pending-comments.jsonl docker compose --profile bridge up -d --build bridge-worker
 
@@ -318,6 +322,7 @@ Note:
 - `BRIDGE_NOTIFY_COMMAND` runs as a shell command in the worker runtime context.
 - If worker runs in Docker, host `tmux` is usually not reachable from container runtime.
 - `BRIDGE_MODE_FILE` is project-wide fallback; keep it on `mode=human` unless you explicitly want AI mode without labels.
+- `BRIDGE_ALLOW_MODE_COMMENT_OVERRIDE=true` allows latest non-bridge `mode: ai|human` comment to override label/file mode resolution.
 
 Action command example:
 
@@ -361,6 +366,7 @@ Main variables in `.env.example`:
 - `BRIDGE_NOTIFY_COMMAND` (optional shell command for queue notifications)
 - `BRIDGE_NOTIFY_TIMEOUT_SECONDS`
 - `BRIDGE_MODE_FILE` (optional fallback mode file path)
+- `BRIDGE_ALLOW_MODE_COMMENT_OVERRIDE` (default `false`; enables `mode: ai|human` task-comment override)
 - `BRIDGE_SKIP_DONE` (default `true`, skip tasks where `done=true`)
 - `BRIDGE_ALLOWED_BUCKET_IDS` (optional comma-separated bucket IDs to include)
 - `BRIDGE_REQUIRED_LABELS` (optional comma-separated labels, at least one must match)

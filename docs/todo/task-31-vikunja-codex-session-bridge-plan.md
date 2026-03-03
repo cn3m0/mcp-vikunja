@@ -226,6 +226,7 @@ If session binding invalid/missing:
 - Added offline-safe bridge comment spool with replay (`BRIDGE_PENDING_COMMENTS_FILE`) so failed comment writes are retried later.
 - Added exponential retry backoff for failed poll cycles (`BRIDGE_BACKOFF_MIN_SECONDS`, `BRIDGE_BACKOFF_MAX_SECONDS`).
 - Added multi-project polling support (`BRIDGE_PROJECT_IDS` / `--project-ids`) with backward compatibility for single `BRIDGE_PROJECT_ID`.
+- Added optional task-level mode override via comments (`mode: ai|human`) behind `BRIDGE_ALLOW_MODE_COMMENT_OVERRIDE`.
 
 ## Open Questions
 

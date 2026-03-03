@@ -38,6 +38,13 @@ def parse_command(text: str) -> tuple[str, str] | None:
     return match.group(1).lower(), match.group(2).strip()
 
 
+def parse_mode_override(text: str) -> str | None:
+    match = re.match(r"^mode\s*:\s*(ai|human)\s*$", text.strip(), flags=re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1).lower()
+
+
 @dataclass
 class ActionCommand:
     action: str
@@ -241,6 +248,18 @@ def read_mode_file(path: Path | None) -> str | None:
 
 
 def task_mode(task: dict[str, Any], fallback_mode: str | None = None) -> str:
+    return task_mode_with_override(task, fallback_mode=fallback_mode, comment_override=None)
+
+
+def task_mode_with_override(
+    task: dict[str, Any],
+    *,
+    fallback_mode: str | None = None,
+    comment_override: str | None = None,
+) -> str:
+    if comment_override in {"ai", "human"}:
+        return comment_override
+
     titles = task_label_titles(task)
     if "mode/human" in titles:
         return "human"
@@ -285,6 +304,18 @@ def should_process_task(
             return False, "labels"
 
     return True, "selected"
+
+
+def latest_mode_override_from_comments(comments: list[dict[str, Any]]) -> str | None:
+    mode: str | None = None
+    for comment in comments:
+        text = normalize_text(str(comment.get("comment", "")))
+        if text.startswith(BRIDGE_PREFIX):
+            continue
+        parsed = parse_mode_override(text)
+        if parsed:
+            mode = parsed
+    return mode
 
 
 @dataclass
@@ -360,6 +391,7 @@ class BridgeWorker:
         required_labels: set[str] | None = None,
         pending_comments_path: Path | None = None,
         pending_comments_max: int = 500,
+        allow_mode_comment_override: bool = False,
     ) -> None:
         self.client = client
         merged_project_ids = merge_project_ids(project_id, project_ids or [])
@@ -381,6 +413,7 @@ class BridgeWorker:
             pending_comments_path = state_path.parent / "pending-bridge-comments.jsonl"
         self.pending_comments_path = pending_comments_path
         self.pending_comments_max = max(int(pending_comments_max), 1)
+        self.allow_mode_comment_override = allow_mode_comment_override
 
     def run_once(self) -> None:
         self._flush_pending_bridge_comments(limit=50)
@@ -399,7 +432,11 @@ class BridgeWorker:
             LOGGER.info("Found %d tasks in project %s", len(tasks), project_id)
 
             for task in sorted(tasks, key=lambda t: int(t.get("id", 0))):
-                mode = task_mode(task, fallback_mode=fallback_mode)
+                comments = self.client.list_task_comments(task_id=int(task["id"]), order_by="asc")
+                comment_override = None
+                if self.allow_mode_comment_override:
+                    comment_override = latest_mode_override_from_comments(comments)
+                mode = task_mode_with_override(task, fallback_mode=fallback_mode, comment_override=comment_override)
                 allowed, reason = should_process_task(
                     task,
                     mode=mode,
@@ -418,7 +455,7 @@ class BridgeWorker:
                         skipped_labels += 1
                     continue
                 selected += 1
-                self._process_task(task)
+                self._process_task(task, comments=comments)
 
         LOGGER.info(
             "Selection summary: selected=%d skipped_mode=%d skipped_done=%d skipped_bucket=%d skipped_labels=%d",
@@ -430,10 +467,11 @@ class BridgeWorker:
         )
         self.state.save()
 
-    def _process_task(self, task: dict[str, Any]) -> None:
+    def _process_task(self, task: dict[str, Any], comments: list[dict[str, Any]] | None = None) -> None:
         task_id = int(task["id"])
         title = str(task.get("title", ""))
-        comments = self.client.list_task_comments(task_id=task_id, order_by="asc")
+        if comments is None:
+            comments = self.client.list_task_comments(task_id=task_id, order_by="asc")
         LOGGER.info("Processing task #%s (%s), comments=%d", task_id, title, len(comments))
 
         task_state = self.state.get_task_state(task_id)
@@ -903,6 +941,12 @@ def parse_args() -> argparse.Namespace:
         help="Optional comma-separated labels required for processing",
     )
     parser.add_argument(
+        "--allow-mode-comment-override",
+        action=argparse.BooleanOptionalAction,
+        default=parse_bool(os.getenv("BRIDGE_ALLOW_MODE_COMMENT_OVERRIDE"), False),
+        help="Allow task mode override from comments like `mode: ai|human`",
+    )
+    parser.add_argument(
         "--pending-comments-file",
         default=os.getenv("BRIDGE_PENDING_COMMENTS_FILE", ""),
         help="Optional JSONL file for bridge comments that failed to post",
@@ -960,6 +1004,7 @@ def main() -> int:
             skip_done=bool(args.skip_done),
             allowed_bucket_ids=parse_int_set(args.allowed_bucket_ids),
             required_labels=parse_lower_set(args.required_labels),
+            allow_mode_comment_override=bool(args.allow_mode_comment_override),
             pending_comments_path=Path(args.pending_comments_file).expanduser() if args.pending_comments_file else None,
             pending_comments_max=args.pending_comments_max,
         )
