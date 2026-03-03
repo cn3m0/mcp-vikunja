@@ -152,7 +152,7 @@ services:
       ]
     volumes:
       - bridge_state:/var/lib/vikunja-bridge
-      - bridge_work:/srv/work
+      - ${BRIDGE_WORK_HOST_DIR:-./runtime/bridge-work}:/srv/work
     networks:
       - vikunja_net
 
@@ -207,7 +207,6 @@ volumes:
   db_data:
   vikunja_files:
   bridge_state:
-  bridge_work:
 
 networks:
   vikunja_net:

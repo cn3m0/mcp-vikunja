@@ -144,6 +144,7 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
 - failed poll cycles use exponential backoff (`BRIDGE_BACKOFF_MIN_SECONDS` / `BRIDGE_BACKOFF_MAX_SECONDS`)
 - optional trigger-file wake-up (`BRIDGE_TRIGGER_FILE`) for near-real-time webhook nudges
 - optional auto bucket transitions after queued commands (`ack` / `done` / `blocked`)
+- optional host-side tmux session bridge loop (`scripts/session_bridge_loop.py`) for inbox dispatch + ticket reply sync
 
 ## Prerequisites
 
@@ -244,7 +245,10 @@ Validation:
 - `make test-bridge` (bridge parser/unit checks)
 - `make test-webhook` (bridge webhook helper checks)
 - `make test-api` (Vikunja API helper unit checks)
+- `make test-session-bridge` (tmux/session bridge unit checks)
 - `make bridge-once` (one bridge poll cycle, optional `BRIDGE_DRY_RUN=1`)
+- `make session-bridge-once` (one host-side inbox<->tmux sync cycle)
+- `make session-bridge-loop` (continuous host-side inbox<->tmux sync loop)
 - `make monitor` (quick health checks: compose + API + MCP port)
 - `make monitor-webhook` (monitor + bridge-webhook health endpoint)
 - `make monitor-full` (monitor + verify + test-mcp smoke)
@@ -322,6 +326,39 @@ PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker --project-id 13 --
 # Direct python invocation for multiple projects
 PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker --project-ids 13,14 --once
 ```
+
+tmux session bridge loop (host-side):
+
+```bash
+# Shared host path for bridge inbox files
+mkdir -p ./runtime/bridge-work
+
+# Recreate bridge-worker once after enabling bind mount path
+docker compose --profile bridge up -d --build bridge-worker
+
+# One-shot cycle (safe dry-run first)
+BRIDGE_DRY_RUN=1 make session-bridge-once
+
+# Continuous loop
+make session-bridge-loop
+
+# Optional default fallback target if bind session is missing
+export BRIDGE_SESSION_TMUX_TARGET=codex-main:0.0
+make session-bridge-loop
+```
+
+tmux reply protocol:
+
+```bash
+# In your tmux shell, print a reply line for a ticket:
+echo "BRIDGE_REPLY task=31 I received this and started implementation."
+```
+
+The session bridge loop captures this line from tmux output and posts it back to Vikunja as a `[bridge]` update comment on task `31`.
+
+Note:
+- `session_bridge_loop.py` is a host-side process, not a Docker service.
+- It requires a running local `tmux` server and reachable target pane/session.
 
 Queue notification example (host-side worker):
 
@@ -434,6 +471,7 @@ Main variables in `.env.example`:
 - `BRIDGE_PENDING_COMMENTS_MAX` (max retained queued bridge comments, default `500`)
 - `BRIDGE_BACKOFF_MIN_SECONDS` (retry backoff min delay for failed poll cycles)
 - `BRIDGE_BACKOFF_MAX_SECONDS` (retry backoff max delay for failed poll cycles)
+- `BRIDGE_WORK_HOST_DIR` (host bind path mounted into bridge-worker at `/srv/work`)
 - `BRIDGE_TRIGGER_FILE` (optional file path used to wake worker immediately)
 - `BRIDGE_TRIGGER_CHECK_SECONDS` (poll interval while waiting for trigger updates)
 - `BRIDGE_WEBHOOK_PORT`
@@ -445,6 +483,12 @@ Main variables in `.env.example`:
 - `BRIDGE_WEBHOOK_REQUIRE_PROJECT_MATCH` (default `false`; reject webhook when project id cannot be detected while allowlist is set)
 - `BRIDGE_WEBHOOK_MONITOR` (default `false`; include webhook checks in monitor stack)
 - `BRIDGE_WEBHOOK_HEALTH_URL` (default `http://localhost:8090/healthz`)
+- `BRIDGE_SESSION_STATE_FILE` (state for processed inbox items + tmux log offsets)
+- `BRIDGE_SESSION_TMUX_LOG_FILE` (tmux pipe-pane output log file used for reply sync)
+- `BRIDGE_SESSION_INBOX_ROOTS` (comma-separated roots scanned for `inbox/task-*-comment-*.md`, default `./runtime/bridge-work`)
+- `BRIDGE_SESSION_TMUX_TARGET` (optional fallback tmux target when bind session is missing)
+- `BRIDGE_SESSION_REPLY_PREFIX` (default `BRIDGE_REPLY`)
+- `BRIDGE_SESSION_POLL_INTERVAL` (default `5`, seconds)
 
 ## Security
 

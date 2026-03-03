@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help onboard up bootstrap verify test-mcp test-bridge test-webhook test-api bridge-once monitor monitor-webhook monitor-full watchdog-once watchdog-loop backup-drill full-check publish-check logs ps down clean
+.PHONY: help onboard up bootstrap verify test-mcp test-bridge test-webhook test-api test-session-bridge bridge-once session-bridge-once session-bridge-loop monitor monitor-webhook monitor-full watchdog-once watchdog-loop backup-drill full-check publish-check logs ps down clean
 
 help:
 	@echo "Available targets:"
@@ -12,7 +12,10 @@ help:
 	@echo "  make test-bridge - Run bridge worker parser/unit checks"
 	@echo "  make test-webhook - Run bridge webhook unit checks"
 	@echo "  make test-api   - Run Vikunja API helper unit checks"
+	@echo "  make test-session-bridge - Run tmux/session bridge unit checks"
 	@echo "  make bridge-once - Run one bridge poll cycle (set BRIDGE_PROJECT_ID/BRIDGE_PROJECT_IDS, optional BRIDGE_DRY_RUN=1)"
+	@echo "  make session-bridge-once - Run one inbox<->tmux sync cycle"
+	@echo "  make session-bridge-loop - Run continuous inbox<->tmux sync loop"
 	@echo "  make monitor    - Quick local stack health checks"
 	@echo "  make monitor-webhook - Health checks incl. bridge-webhook"
 	@echo "  make monitor-full - Health checks + verify/test-mcp smoke"
@@ -51,6 +54,9 @@ test-webhook:
 test-api:
 	python3 scripts/test_vikunja_api.py
 
+test-session-bridge:
+	python3 scripts/test_session_bridge.py
+
 bridge-once:
 	@set -a; \
 	if [ -f .env ]; then . ./.env; fi; \
@@ -76,6 +82,34 @@ bridge-once:
 	  --pending-comments-file "$${BRIDGE_PENDING_COMMENTS_FILE:-}" \
 	  --pending-comments-max "$${BRIDGE_PENDING_COMMENTS_MAX:-500}" \
 	  --once $$EXTRA
+
+session-bridge-once:
+	@set -a; \
+	if [ -f .env ]; then . ./.env; fi; \
+	set +a; \
+	EXTRA=""; \
+	if [ "$${BRIDGE_DRY_RUN:-0}" = "1" ]; then EXTRA="--dry-run"; fi; \
+	python3 scripts/session_bridge_loop.py \
+	  --state-file "$${BRIDGE_SESSION_STATE_FILE:-/tmp/mcp-vikunja-session-bridge/state.json}" \
+	  --tmux-log-file "$${BRIDGE_SESSION_TMUX_LOG_FILE:-/tmp/mcp-vikunja-session-bridge/tmux-output.log}" \
+	  --inbox-roots "$${BRIDGE_SESSION_INBOX_ROOTS:-./runtime/bridge-work}" \
+	  --default-tmux-target "$${BRIDGE_SESSION_TMUX_TARGET:-}" \
+	  --reply-prefix "$${BRIDGE_SESSION_REPLY_PREFIX:-BRIDGE_REPLY}" \
+	  --once $$EXTRA
+
+session-bridge-loop:
+	@set -a; \
+	if [ -f .env ]; then . ./.env; fi; \
+	set +a; \
+	EXTRA=""; \
+	if [ "$${BRIDGE_DRY_RUN:-0}" = "1" ]; then EXTRA="--dry-run"; fi; \
+	python3 scripts/session_bridge_loop.py \
+	  --state-file "$${BRIDGE_SESSION_STATE_FILE:-/tmp/mcp-vikunja-session-bridge/state.json}" \
+	  --tmux-log-file "$${BRIDGE_SESSION_TMUX_LOG_FILE:-/tmp/mcp-vikunja-session-bridge/tmux-output.log}" \
+	  --inbox-roots "$${BRIDGE_SESSION_INBOX_ROOTS:-./runtime/bridge-work}" \
+	  --default-tmux-target "$${BRIDGE_SESSION_TMUX_TARGET:-}" \
+	  --reply-prefix "$${BRIDGE_SESSION_REPLY_PREFIX:-BRIDGE_REPLY}" \
+	  --poll-interval-seconds "$${BRIDGE_SESSION_POLL_INTERVAL:-5}" $$EXTRA
 
 monitor:
 	python3 scripts/monitor_stack.py

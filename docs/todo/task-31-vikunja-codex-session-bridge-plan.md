@@ -234,6 +234,9 @@ If session binding invalid/missing:
 - Exposed direct task field updates through MCP tool `update_task` (faster workflow edits from agent sessions).
 - Exposed direct single-task reads via MCP tool `get_task` (fast lookup by Vikunja task ID/URL).
 - Added optional task date/status automation on queue commands (`BRIDGE_AUTO_SET_START_DATE_ON_ACK`, `BRIDGE_AUTO_SET_DONE_ON_DONE`, `BRIDGE_AUTO_SET_END_DATE_ON_DONE`).
+- Added host-side tmux session bridge loop (`scripts/session_bridge_loop.py`) for:
+  - dispatching inbox work-order files into tmux sessions
+  - syncing tmux reply lines (`BRIDGE_REPLY task=<id> ...`) back into Vikunja comments
 
 ## Open Questions
 
