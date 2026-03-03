@@ -8,7 +8,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +35,37 @@ def parse_command(text: str) -> tuple[str, str] | None:
     if not match:
         return None
     return match.group(1).lower(), match.group(2).strip()
+
+
+@dataclass
+class ActionCommand:
+    action: str
+    bucket_id: int
+    action_id: str
+
+
+def parse_action_command(text: str) -> ActionCommand | None:
+    # level-2 command requiring explicit confirmation
+    # format: action: move bucket=40 id=move-to-doing-123
+    match = re.match(
+        r"^action\s*:\s*(move|reopen)\s+bucket\s*=\s*(\d+)\s+id\s*=\s*([a-zA-Z0-9._-]+)\s*$",
+        text.strip(),
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return None
+    return ActionCommand(
+        action=match.group(1).lower(),
+        bucket_id=int(match.group(2)),
+        action_id=match.group(3),
+    )
+
+
+def parse_confirmation_token(text: str) -> str | None:
+    match = re.match(r"^confirm\s*:\s*([a-zA-Z0-9._-]+)\s*$", text.strip(), flags=re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1)
 
 
 def parse_bind_block(text: str) -> dict[str, str] | None:
@@ -71,6 +102,8 @@ def task_mode(task: dict[str, Any]) -> str:
 class TaskState:
     last_processed_comment_id: int = 0
     last_command_hash: str = ""
+    binding_hash: str = ""
+    used_confirmations: set[str] | None = None
 
 
 class BridgeState:
@@ -94,13 +127,18 @@ class BridgeState:
         return TaskState(
             last_processed_comment_id=int(payload.get("last_processed_comment_id", 0)),
             last_command_hash=str(payload.get("last_command_hash", "")),
+            binding_hash=str(payload.get("binding_hash", "")),
+            used_confirmations=set(payload.get("used_confirmations", [])),
         )
 
     def update_task_state(self, task_id: int, state: TaskState) -> None:
         tasks = self._data.setdefault("tasks", {})
+        used_confirmations = sorted(list(state.used_confirmations or set()))[-200:]
         tasks[str(task_id)] = {
             "last_processed_comment_id": int(state.last_processed_comment_id),
             "last_command_hash": state.last_command_hash,
+            "binding_hash": state.binding_hash,
+            "used_confirmations": used_confirmations,
             "updated_at": _now_iso(),
         }
         self._dirty = True
@@ -122,11 +160,13 @@ class BridgeWorker:
         project_id: int,
         state_path: Path,
         dry_run: bool = False,
+        confirm_ttl_hours: int = 24,
     ) -> None:
         self.client = client
         self.project_id = project_id
         self.state = BridgeState(state_path)
         self.dry_run = dry_run
+        self.confirm_ttl = timedelta(hours=max(confirm_ttl_hours, 1))
 
     def run_once(self) -> None:
         tasks = self.client.list_tasks(project_id=self.project_id, page=1, per_page=300)
@@ -148,62 +188,179 @@ class BridgeWorker:
 
         task_state = self.state.get_task_state(task_id)
         binding: dict[str, str] | None = None
+        confirmations: dict[str, tuple[int, datetime]] = {}
+        used_confirmations = task_state.used_confirmations or set()
 
         for comment in comments:
             comment_id = int(comment.get("id", 0))
+            text = normalize_text(str(comment.get("comment", "")))
+            created_at = self._parse_comment_created(comment.get("created"))
+
+            token = parse_confirmation_token(text)
+            if token and created_at:
+                confirmations[token] = (comment_id, created_at)
+
             if comment_id <= task_state.last_processed_comment_id:
-                bind = parse_bind_block(normalize_text(str(comment.get("comment", ""))))
+                bind = parse_bind_block(text)
                 if bind:
                     binding = bind
                 continue
 
-            text = normalize_text(str(comment.get("comment", "")))
-
             bind = parse_bind_block(text)
             if bind:
                 binding = bind
+                task_state.binding_hash = self._binding_hash(bind)
 
             # Never process worker-authored comments.
             if text.startswith(BRIDGE_PREFIX):
                 task_state.last_processed_comment_id = comment_id
                 continue
 
-            command = parse_command(text)
-            if command is None:
-                task_state.last_processed_comment_id = comment_id
-                continue
-
-            cmd_name, cmd_body = command
-            command_hash = hashlib.sha256(f"{task_id}:{comment_id}:{cmd_name}:{cmd_body}".encode("utf-8")).hexdigest()
+            command_hash = hashlib.sha256(f"{task_id}:{comment_id}:{text}".encode("utf-8")).hexdigest()
             if command_hash == task_state.last_command_hash:
                 task_state.last_processed_comment_id = comment_id
                 continue
 
-            if not binding:
-                self._post_bridge_comment(task_id, f"blocked: missing or invalid binding (comment_id={comment_id})")
+            action_cmd = parse_action_command(text)
+            if action_cmd:
+                self._handle_action_command(
+                    task=task,
+                    comment_id=comment_id,
+                    action_cmd=action_cmd,
+                    binding=binding,
+                    confirmations=confirmations,
+                    used_confirmations=used_confirmations,
+                )
                 task_state.last_processed_comment_id = comment_id
                 task_state.last_command_hash = command_hash
                 continue
 
-            try:
-                output_path = self._write_work_order(
+            command = parse_command(text)
+            if command:
+                cmd_name, cmd_body = command
+                self._handle_queue_command(
                     task=task,
                     comment_id=comment_id,
                     command_name=cmd_name,
                     command_body=cmd_body,
                     binding=binding,
                 )
-                self._post_bridge_comment(
-                    task_id,
-                    f"ack: queued command={cmd_name} comment_id={comment_id} file={output_path}",
-                )
-            except Exception as exc:  # pragma: no cover - top-level safety
-                self._post_bridge_comment(task_id, f"blocked: could not queue command_id={comment_id} reason={exc}")
+                task_state.last_processed_comment_id = comment_id
+                task_state.last_command_hash = command_hash
+                continue
 
             task_state.last_processed_comment_id = comment_id
-            task_state.last_command_hash = command_hash
+            # keep last_command_hash unchanged for non-command comments
 
+        task_state.used_confirmations = used_confirmations
         self.state.update_task_state(task_id, task_state)
+
+    @staticmethod
+    def _parse_comment_created(raw: Any) -> datetime | None:
+        if not raw or not isinstance(raw, str):
+            return None
+        value = raw.strip()
+        if value.endswith("Z"):
+            value = value[:-1] + "+00:00"
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _binding_hash(binding: dict[str, str]) -> str:
+        payload = json.dumps(binding, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _handle_queue_command(
+        self,
+        *,
+        task: dict[str, Any],
+        comment_id: int,
+        command_name: str,
+        command_body: str,
+        binding: dict[str, str] | None,
+    ) -> None:
+        task_id = int(task["id"])
+        if not binding:
+            self._post_bridge_comment(task_id, f"blocked: missing or invalid binding (comment_id={comment_id})")
+            return
+
+        try:
+            output_path = self._write_work_order(
+                task=task,
+                comment_id=comment_id,
+                command_name=command_name,
+                command_body=command_body,
+                binding=binding,
+            )
+            self._post_bridge_comment(
+                task_id,
+                f"ack: queued command={command_name} comment_id={comment_id} file={output_path}",
+            )
+        except Exception as exc:  # pragma: no cover - top-level safety
+            self._post_bridge_comment(task_id, f"blocked: could not queue command_id={comment_id} reason={exc}")
+
+    def _handle_action_command(
+        self,
+        *,
+        task: dict[str, Any],
+        comment_id: int,
+        action_cmd: ActionCommand,
+        binding: dict[str, str] | None,
+        confirmations: dict[str, tuple[int, datetime]],
+        used_confirmations: set[str],
+    ) -> None:
+        task_id = int(task["id"])
+        if not binding:
+            self._post_bridge_comment(task_id, f"blocked: missing or invalid binding for action (comment_id={comment_id})")
+            return
+
+        if action_cmd.action_id in used_confirmations:
+            self._post_bridge_comment(task_id, f"blocked: confirmation already used (action_id={action_cmd.action_id})")
+            return
+
+        token = confirmations.get(action_cmd.action_id)
+        if not token:
+            self._post_bridge_comment(
+                task_id,
+                f"blocked: missing confirmation for action_id={action_cmd.action_id} expected `confirm: {action_cmd.action_id}`",
+            )
+            return
+
+        confirm_comment_id, confirm_created = token
+        if confirm_comment_id >= comment_id:
+            self._post_bridge_comment(
+                task_id,
+                f"blocked: confirmation must be before action command (action_id={action_cmd.action_id})",
+            )
+            return
+
+        if datetime.now(timezone.utc) - confirm_created > self.confirm_ttl:
+            self._post_bridge_comment(
+                task_id,
+                f"blocked: confirmation expired (action_id={action_cmd.action_id})",
+            )
+            return
+
+        project_id = int(task.get("project_id", self.project_id))
+        try:
+            self.client.move_task(
+                task_id=task_id,
+                target_bucket_id=action_cmd.bucket_id,
+                project_id=project_id,
+            )
+            used_confirmations.add(action_cmd.action_id)
+            self._post_bridge_comment(
+                task_id,
+                "ack: executed action="
+                f"{action_cmd.action} bucket={action_cmd.bucket_id} action_id={action_cmd.action_id}",
+            )
+        except Exception as exc:
+            self._post_bridge_comment(
+                task_id,
+                f"blocked: action failed action_id={action_cmd.action_id} reason={exc}",
+            )
 
     def _write_work_order(
         self,
@@ -269,6 +426,12 @@ def parse_args() -> argparse.Namespace:
         help="Persistent state file path",
     )
     parser.add_argument("--interval", type=int, default=int(os.getenv("BRIDGE_POLL_INTERVAL", "15")))
+    parser.add_argument(
+        "--confirm-ttl-hours",
+        type=int,
+        default=int(os.getenv("BRIDGE_CONFIRM_TTL_HOURS", "24")),
+        help="How long confirmation tokens remain valid",
+    )
     parser.add_argument("--once", action="store_true", help="Run one poll cycle and exit")
     parser.add_argument("--dry-run", action="store_true", help="Do not write files or comments")
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
@@ -289,6 +452,7 @@ def main() -> int:
             project_id=args.project_id,
             state_path=Path(args.state_file),
             dry_run=args.dry_run,
+            confirm_ttl_hours=args.confirm_ttl_hours,
         )
         if args.once:
             worker.run_once()

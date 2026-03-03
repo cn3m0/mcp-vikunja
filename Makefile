@@ -47,6 +47,7 @@ bridge-once:
 	PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker \
 	  --project-id "$$PROJECT_ID" \
 	  --state-file "$${BRIDGE_STATE_FILE:-/tmp/mcp-vikunja-bridge/state.json}" \
+	  --confirm-ttl-hours "$${BRIDGE_CONFIRM_TTL_HOURS:-24}" \
 	  --once $$EXTRA
 
 full-check: verify test-mcp

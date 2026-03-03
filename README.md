@@ -122,6 +122,9 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
 - idempotent state watermark (`last_processed_comment_id`)
 - bridge comment prefix protection (`[bridge]`)
 - inbox work order file output: `<workdir>/inbox/task-<id>-comment-<id>.md`
+- level-2 action policy with explicit confirmations:
+  - `confirm: <action-id>`
+  - `action: move bucket=<id> id=<action-id>`
 
 ## Prerequisites
 
@@ -238,6 +241,18 @@ set -a; source .env; set +a
 PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker --project-id 13 --once
 ```
 
+Action command example:
+
+```text
+confirm: move-to-doing-001
+action: move bucket=40 id=move-to-doing-001
+```
+
+The action is executed only if:
+- task is labeled `mode/ai`
+- valid `[bind]` block exists
+- confirmation token exists, is unexpired, and unused
+
 ## Environment Variables
 
 Main variables in `.env.example`:
@@ -257,6 +272,7 @@ Main variables in `.env.example`:
 - `BRIDGE_PROJECT_ID`
 - `BRIDGE_POLL_INTERVAL`
 - `BRIDGE_STATE_FILE`
+- `BRIDGE_CONFIRM_TTL_HOURS`
 
 ## Security
 
