@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help onboard up bootstrap verify test-mcp full-check publish-check logs ps down clean
+.PHONY: help onboard up bootstrap verify test-mcp test-bridge bridge-once full-check publish-check logs ps down clean
 
 help:
 	@echo "Available targets:"
@@ -9,6 +9,8 @@ help:
 	@echo "  make bootstrap  - Create/verify admin user and generate API token"
 	@echo "  make verify     - Run Vikunja workflow verification"
 	@echo "  make test-mcp   - Run MCP streamable-http smoke test"
+	@echo "  make test-bridge - Run bridge worker parser/unit checks"
+	@echo "  make bridge-once - Run one bridge poll cycle (set BRIDGE_PROJECT_ID, optional BRIDGE_DRY_RUN=1)"
 	@echo "  make full-check - Run verify and MCP smoke test"
 	@echo "  make publish-check - Run static checks for GitHub publishing"
 	@echo "  make logs       - Follow service logs"
@@ -31,6 +33,21 @@ verify:
 
 test-mcp:
 	python3 scripts/test_mcp_adapter.py
+
+test-bridge:
+	python3 scripts/test_bridge_worker.py
+
+bridge-once:
+	@set -a; \
+	if [ -f .env ]; then . ./.env; fi; \
+	set +a; \
+	PROJECT_ID=$${BRIDGE_PROJECT_ID:-13}; \
+	EXTRA=""; \
+	if [ "$${BRIDGE_DRY_RUN:-0}" = "1" ]; then EXTRA="--dry-run"; fi; \
+	PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker \
+	  --project-id "$$PROJECT_ID" \
+	  --state-file "$${BRIDGE_STATE_FILE:-/tmp/mcp-vikunja-bridge/state.json}" \
+	  --once $$EXTRA
 
 full-check: verify test-mcp
 

@@ -65,9 +65,43 @@ services:
     networks:
       - vikunja_net
 
+  bridge-worker:
+    build:
+      context: ./mcp_adapter
+    profiles: ["bridge"]
+    restart: unless-stopped
+    depends_on:
+      vikunja:
+        condition: service_healthy
+    environment:
+      VIKUNJA_URL: ${VIKUNJA_INTERNAL_URL}
+      VIKUNJA_API_TOKEN: ${VIKUNJA_API_TOKEN}
+      VIKUNJA_TIMEOUT: "15"
+      BRIDGE_POLL_INTERVAL: ${BRIDGE_POLL_INTERVAL:-15}
+      LOG_LEVEL: INFO
+    command:
+      [
+        "python",
+        "-m",
+        "vikunja_mcp.bridge_worker",
+        "--project-id",
+        "${BRIDGE_PROJECT_ID:-13}",
+        "--state-file",
+        "${BRIDGE_STATE_FILE:-/var/lib/vikunja-bridge/state.json}",
+        "--interval",
+        "${BRIDGE_POLL_INTERVAL:-15}",
+      ]
+    volumes:
+      - bridge_state:/var/lib/vikunja-bridge
+      - bridge_work:/srv/work
+    networks:
+      - vikunja_net
+
 volumes:
   db_data:
   vikunja_files:
+  bridge_state:
+  bridge_work:
 
 networks:
   vikunja_net:

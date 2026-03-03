@@ -51,6 +51,7 @@ Runtime services:
 - `db`: `postgres:16-alpine`
 - `vikunja`: `vikunja/vikunja:latest` on `http://localhost:3456`
 - `mcp-adapter`: FastMCP service on `http://localhost:8000/mcp`
+- `bridge-worker` (optional profile): pull-based task bridge worker
 
 ## Status
 
@@ -110,6 +111,17 @@ Runtime services:
 - environment-based configuration
 - no hardcoded credentials
 - fully self-hostable
+
+### Bridge worker MVP
+
+Implemented as `python -m vikunja_mcp.bridge_worker`:
+
+- pull-based polling loop
+- `mode/ai` ownership gate
+- `[bind]...[/bind]` parsing (`node`, `session`, `workdir`)
+- idempotent state watermark (`last_processed_comment_id`)
+- bridge comment prefix protection (`[bridge]`)
+- inbox work order file output: `<workdir>/inbox/task-<id>-comment-<id>.md`
 
 ## Prerequisites
 
@@ -207,8 +219,20 @@ Validation:
 
 - `make verify` (Vikunja workflow validation)
 - `make test-mcp` (MCP protocol + tool-call validation)
+- `make test-bridge` (bridge parser/unit checks)
+- `make bridge-once` (one bridge poll cycle, optional `BRIDGE_DRY_RUN=1`)
 - `make full-check` (verify + test-mcp)
 - `make publish-check` (static publish checks)
+
+Bridge worker run options:
+
+```bash
+# One-shot local cycle
+BRIDGE_PROJECT_ID=13 BRIDGE_DRY_RUN=1 make bridge-once
+
+# Continuous bridge worker via compose profile
+docker compose --profile bridge up -d --build bridge-worker
+```
 
 ## Environment Variables
 
@@ -226,6 +250,9 @@ Main variables in `.env.example`:
 - `VIKUNJA_ADMIN_PASSWORD`
 - `VIKUNJA_API_TOKEN_TITLE`
 - `VIKUNJA_API_TOKEN`
+- `BRIDGE_PROJECT_ID`
+- `BRIDGE_POLL_INTERVAL`
+- `BRIDGE_STATE_FILE`
 
 ## Security
 
