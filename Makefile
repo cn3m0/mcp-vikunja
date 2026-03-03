@@ -52,6 +52,8 @@ bridge-once:
 	  --state-file "$${BRIDGE_STATE_FILE:-/tmp/mcp-vikunja-bridge/state.json}" \
 	  --confirm-ttl-hours "$${BRIDGE_CONFIRM_TTL_HOURS:-24}" \
 	  --confirm-allowed-users "$${BRIDGE_CONFIRM_ALLOWED_USERS:-}" \
+	  --notify-command "$${BRIDGE_NOTIFY_COMMAND:-}" \
+	  --notify-timeout-seconds "$${BRIDGE_NOTIFY_TIMEOUT_SECONDS:-8}" \
 	  --once $$EXTRA
 
 monitor:

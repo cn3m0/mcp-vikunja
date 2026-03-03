@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -99,6 +100,13 @@ def parse_allowed_users(raw: str | None) -> set[str] | None:
     return values
 
 
+def render_notify_command(template: str, values: dict[str, str]) -> str:
+    rendered = template
+    for key, value in values.items():
+        rendered = rendered.replace(f"{{{key}}}", value)
+    return rendered
+
+
 def comment_author_username(comment: dict[str, Any]) -> str | None:
     author = comment.get("author") if isinstance(comment, dict) else None
     if not isinstance(author, dict):
@@ -179,6 +187,8 @@ class BridgeWorker:
         dry_run: bool = False,
         confirm_ttl_hours: int = 24,
         confirm_allowed_users: set[str] | None = None,
+        notify_command: str = "",
+        notify_timeout_seconds: int = 8,
     ) -> None:
         self.client = client
         self.project_id = project_id
@@ -186,6 +196,8 @@ class BridgeWorker:
         self.dry_run = dry_run
         self.confirm_ttl = timedelta(hours=max(confirm_ttl_hours, 1))
         self.confirm_allowed_users = confirm_allowed_users
+        self.notify_command = notify_command.strip()
+        self.notify_timeout_seconds = max(notify_timeout_seconds, 1)
 
     def run_once(self) -> None:
         tasks = self.client.list_tasks(project_id=self.project_id, page=1, per_page=300)
@@ -318,6 +330,18 @@ class BridgeWorker:
                 task_id,
                 f"ack: queued command={command_name} comment_id={comment_id} file={output_path}",
             )
+            notify_error = self._notify_queue_event(
+                task=task,
+                comment_id=comment_id,
+                command_name=command_name,
+                binding=binding,
+                output_path=output_path,
+            )
+            if notify_error:
+                self._post_bridge_comment(
+                    task_id,
+                    f"update: notify failed command={command_name} comment_id={comment_id} reason={notify_error}",
+                )
         except Exception as exc:  # pragma: no cover - top-level safety
             self._post_bridge_comment(task_id, f"blocked: could not queue command_id={comment_id} reason={exc}")
 
@@ -445,6 +469,56 @@ class BridgeWorker:
             return
         self.client.add_task_comment(task_id=task_id, comment=content)
 
+    @staticmethod
+    def _one_line(value: Any) -> str:
+        return str(value).replace("\n", " ").replace("\r", " ").strip()
+
+    def _notify_queue_event(
+        self,
+        *,
+        task: dict[str, Any],
+        comment_id: int,
+        command_name: str,
+        binding: dict[str, str],
+        output_path: str,
+    ) -> str | None:
+        if not self.notify_command:
+            return None
+
+        task_id = int(task["id"])
+        values = {
+            "task_id": str(task_id),
+            "task_title": self._one_line(task.get("title", "")),
+            "comment_id": str(comment_id),
+            "command": command_name,
+            "node": self._one_line(binding.get("node", "")),
+            "session": self._one_line(binding.get("session", "")),
+            "workdir": self._one_line(binding.get("workdir", "")),
+            "file": self._one_line(output_path),
+        }
+        command = render_notify_command(self.notify_command, values)
+
+        if self.dry_run:
+            LOGGER.info("Dry-run: notify command: %s", command)
+            return None
+
+        try:
+            proc = subprocess.run(
+                ["bash", "-lc", command],
+                text=True,
+                capture_output=True,
+                timeout=self.notify_timeout_seconds,
+                check=False,
+            )
+            if proc.returncode != 0:
+                stderr = (proc.stderr or "").strip()
+                stdout = (proc.stdout or "").strip()
+                details = stderr or stdout or f"exit_code={proc.returncode}"
+                return self._one_line(details)[:240]
+            return None
+        except Exception as exc:
+            return self._one_line(exc)[:240]
+
 
 def build_client() -> VikunjaClient:
     base_url = os.getenv("VIKUNJA_URL", "http://localhost:3456/api/v1")
@@ -473,6 +547,17 @@ def parse_args() -> argparse.Namespace:
         default=os.getenv("BRIDGE_CONFIRM_ALLOWED_USERS", ""),
         help="Comma-separated usernames allowed to authorize `confirm:` tokens (empty = no restriction)",
     )
+    parser.add_argument(
+        "--notify-command",
+        default=os.getenv("BRIDGE_NOTIFY_COMMAND", ""),
+        help="Optional shell command for queue notifications (placeholders: {task_id}, {task_title}, {comment_id}, {command}, {node}, {session}, {workdir}, {file})",
+    )
+    parser.add_argument(
+        "--notify-timeout-seconds",
+        type=int,
+        default=int(os.getenv("BRIDGE_NOTIFY_TIMEOUT_SECONDS", "8")),
+        help="Timeout for notify shell command execution",
+    )
     parser.add_argument("--once", action="store_true", help="Run one poll cycle and exit")
     parser.add_argument("--dry-run", action="store_true", help="Do not write files or comments")
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
@@ -495,6 +580,8 @@ def main() -> int:
             dry_run=args.dry_run,
             confirm_ttl_hours=args.confirm_ttl_hours,
             confirm_allowed_users=parse_allowed_users(args.confirm_allowed_users),
+            notify_command=args.notify_command,
+            notify_timeout_seconds=args.notify_timeout_seconds,
         )
         if args.once:
             worker.run_once()
