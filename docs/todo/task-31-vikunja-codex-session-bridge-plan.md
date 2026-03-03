@@ -225,6 +225,7 @@ If session binding invalid/missing:
 - Added optional queue notification hook (`BRIDGE_NOTIFY_COMMAND`) for tmux/ntfy/local operator alerts when new work-order files are created.
 - Added offline-safe bridge comment spool with replay (`BRIDGE_PENDING_COMMENTS_FILE`) so failed comment writes are retried later.
 - Added exponential retry backoff for failed poll cycles (`BRIDGE_BACKOFF_MIN_SECONDS`, `BRIDGE_BACKOFF_MAX_SECONDS`).
+- Added multi-project polling support (`BRIDGE_PROJECT_IDS` / `--project-ids`) with backward compatibility for single `BRIDGE_PROJECT_ID`.
 
 ## Open Questions
 

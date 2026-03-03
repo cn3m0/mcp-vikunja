@@ -121,6 +121,52 @@ def parse_int_set(raw: str | None) -> set[int] | None:
     return values
 
 
+def parse_int_list(raw: str | None) -> list[int]:
+    if raw is None:
+        return []
+    values: list[int] = []
+    seen: set[int] = set()
+    for part in raw.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        try:
+            value = int(token)
+        except ValueError:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        values.append(value)
+    return values
+
+
+def parse_optional_int(raw: str | None) -> int | None:
+    if raw is None:
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def merge_project_ids(project_id: int | None, project_ids: list[int]) -> list[int]:
+    values: list[int] = []
+    seen: set[int] = set()
+    if project_id is not None:
+        values.append(project_id)
+        seen.add(project_id)
+    for value in project_ids:
+        if value in seen:
+            continue
+        values.append(value)
+        seen.add(value)
+    return values
+
+
 def parse_bool(raw: str | None, default: bool = False) -> bool:
     if raw is None:
         return default
@@ -300,8 +346,9 @@ class BridgeWorker:
     def __init__(
         self,
         client: VikunjaClient,
-        project_id: int,
+        project_id: int | None,
         state_path: Path,
+        project_ids: list[int] | None = None,
         dry_run: bool = False,
         confirm_ttl_hours: int = 24,
         confirm_allowed_users: set[str] | None = None,
@@ -315,7 +362,11 @@ class BridgeWorker:
         pending_comments_max: int = 500,
     ) -> None:
         self.client = client
-        self.project_id = project_id
+        merged_project_ids = merge_project_ids(project_id, project_ids or [])
+        if not merged_project_ids:
+            raise ValueError("At least one project id must be configured")
+        self.project_ids = merged_project_ids
+        self.project_id = self.project_ids[0]
         self.state = BridgeState(state_path)
         self.dry_run = dry_run
         self.confirm_ttl = timedelta(hours=max(confirm_ttl_hours, 1))
@@ -332,12 +383,10 @@ class BridgeWorker:
         self.pending_comments_max = max(int(pending_comments_max), 1)
 
     def run_once(self) -> None:
-        tasks = self.client.list_tasks(project_id=self.project_id, page=1, per_page=300)
         self._flush_pending_bridge_comments(limit=50)
         fallback_mode = read_mode_file(self.mode_file_path)
         if self.mode_file_path and fallback_mode:
             LOGGER.info("Bridge mode fallback from file %s => %s", self.mode_file_path, fallback_mode)
-        LOGGER.info("Found %d tasks in project %s", len(tasks), self.project_id)
 
         selected = 0
         skipped_mode = 0
@@ -345,27 +394,31 @@ class BridgeWorker:
         skipped_bucket = 0
         skipped_labels = 0
 
-        for task in sorted(tasks, key=lambda t: int(t.get("id", 0))):
-            mode = task_mode(task, fallback_mode=fallback_mode)
-            allowed, reason = should_process_task(
-                task,
-                mode=mode,
-                skip_done=self.skip_done,
-                allowed_bucket_ids=self.allowed_bucket_ids,
-                required_labels=self.required_labels,
-            )
-            if not allowed:
-                if reason == "mode":
-                    skipped_mode += 1
-                elif reason == "done":
-                    skipped_done += 1
-                elif reason == "bucket":
-                    skipped_bucket += 1
-                elif reason == "labels":
-                    skipped_labels += 1
-                continue
-            selected += 1
-            self._process_task(task)
+        for project_id in self.project_ids:
+            tasks = self.client.list_tasks(project_id=project_id, page=1, per_page=300)
+            LOGGER.info("Found %d tasks in project %s", len(tasks), project_id)
+
+            for task in sorted(tasks, key=lambda t: int(t.get("id", 0))):
+                mode = task_mode(task, fallback_mode=fallback_mode)
+                allowed, reason = should_process_task(
+                    task,
+                    mode=mode,
+                    skip_done=self.skip_done,
+                    allowed_bucket_ids=self.allowed_bucket_ids,
+                    required_labels=self.required_labels,
+                )
+                if not allowed:
+                    if reason == "mode":
+                        skipped_mode += 1
+                    elif reason == "done":
+                        skipped_done += 1
+                    elif reason == "bucket":
+                        skipped_bucket += 1
+                    elif reason == "labels":
+                        skipped_labels += 1
+                    continue
+                selected += 1
+                self._process_task(task)
 
         LOGGER.info(
             "Selection summary: selected=%d skipped_mode=%d skipped_done=%d skipped_bucket=%d skipped_labels=%d",
@@ -789,7 +842,17 @@ def build_client() -> VikunjaClient:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Vikunja <-> Codex bridge pull worker")
-    parser.add_argument("--project-id", type=int, required=True, help="Vikunja project id to poll")
+    parser.add_argument(
+        "--project-id",
+        type=int,
+        default=parse_optional_int(os.getenv("BRIDGE_PROJECT_ID")) or 0,
+        help="Single Vikunja project id to poll",
+    )
+    parser.add_argument(
+        "--project-ids",
+        default=os.getenv("BRIDGE_PROJECT_IDS", ""),
+        help="Optional comma-separated Vikunja project ids to poll in one cycle",
+    )
     parser.add_argument(
         "--state-file",
         default=os.getenv("BRIDGE_STATE_FILE", "/tmp/mcp-vikunja-bridge/state.json"),
@@ -877,10 +940,17 @@ def main() -> int:
 
     try:
         client = build_client()
+        merged_project_ids = merge_project_ids(
+            args.project_id if int(args.project_id or 0) > 0 else None,
+            parse_int_list(args.project_ids),
+        )
+        if not merged_project_ids:
+            raise ValueError("Missing project id configuration: set --project-id or --project-ids")
         worker = BridgeWorker(
             client=client,
-            project_id=args.project_id,
+            project_id=None,
             state_path=Path(args.state_file),
+            project_ids=merged_project_ids,
             dry_run=args.dry_run,
             confirm_ttl_hours=args.confirm_ttl_hours,
             confirm_allowed_users=parse_allowed_users(args.confirm_allowed_users),
@@ -897,7 +967,7 @@ def main() -> int:
             worker.run_once()
             return 0
 
-        LOGGER.info("Starting bridge worker (project_id=%s interval=%ss)", args.project_id, args.interval)
+        LOGGER.info("Starting bridge worker (project_ids=%s interval=%ss)", merged_project_ids, args.interval)
         consecutive_failures = 0
         while True:
             try:

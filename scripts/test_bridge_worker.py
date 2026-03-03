@@ -23,7 +23,9 @@ from vikunja_mcp.bridge_worker import (  # noqa: E402
     parse_command,
     parse_confirmation_token,
     parse_int_set,
+    parse_int_list,
     parse_lower_set,
+    merge_project_ids,
     parse_mode_value,
     read_mode_file,
     render_notify_command,
@@ -81,6 +83,29 @@ class FakeListTasksClient(VikunjaClient):
         return 52
 
 
+class FakeMultiProjectClient(FakeClient):
+    def __init__(self) -> None:
+        super().__init__()
+        self.projects_listed: list[int] = []
+
+    def list_tasks(self, project_id: int, *, view_id: int | None = None, page: int = 1, per_page: int = 50) -> list[dict]:  # noqa: ARG002
+        self.projects_listed.append(project_id)
+        # mark tasks as done so selection may skip without requiring list_task_comments
+        return [
+            {
+                "id": (project_id * 1000) + 1,
+                "title": f"task-{project_id}",
+                "project_id": project_id,
+                "done": True,
+                "bucket_id": 40,
+                "labels": [{"title": "mode/ai"}],
+            }
+        ]
+
+    def list_task_comments(self, task_id: int, order_by: str = "asc") -> list[dict]:  # noqa: ARG002
+        return []
+
+
 def main() -> int:
     # parse_command
     assert_equal(parse_command("ack: started"), ("ack", "started"), "ack command parse failed")
@@ -123,6 +148,9 @@ def main() -> int:
     assert_equal(parse_allowed_users("admin, OpsBot"), {"admin", "opsbot"}, "allowed users parse failed")
     assert_equal(parse_lower_set("X, y"), {"x", "y"}, "lower set parse failed")
     assert_equal(parse_int_set("40, 41, x"), {40, 41}, "int set parse failed")
+    assert_equal(parse_int_list("13, 14, x,13"), [13, 14], "int list parse failed")
+    assert_equal(merge_project_ids(12, [13, 12, 14]), [12, 13, 14], "merge project ids failed")
+    assert_equal(merge_project_ids(None, [13, 13]), [13], "merge project ids with none failed")
     assert_equal(parse_int_set(""), None, "empty int set should be None")
     assert_equal(parse_bool("yes"), True, "bool yes parse failed")
     assert_equal(parse_bool("0", default=True), False, "bool false parse failed")
@@ -294,6 +322,20 @@ def main() -> int:
         worker_spool._flush_pending_bridge_comments(limit=10)
         assert_equal(len(flaky.comments), 1, "flush should send previously queued comment")
         assert_equal(pending_file.exists(), False, "pending spool should be removed after successful flush")
+
+    # worker should poll all configured projects in one cycle
+    with tempfile.TemporaryDirectory(prefix="bridge-multi-project-") as tmpdir:
+        multi_client = FakeMultiProjectClient()
+        multi_worker = BridgeWorker(
+            client=multi_client,  # type: ignore[arg-type]
+            project_id=None,
+            project_ids=[13, 14],
+            state_path=Path(tmpdir) / "state.json",
+            dry_run=True,
+            skip_done=True,
+        )
+        multi_worker.run_once()
+        assert_equal(multi_client.projects_listed, [13, 14], "multi-project polling order mismatch")
 
     # list_tasks should flatten bucket payload even if first bucket has no `tasks` key
     bucket_payload = [

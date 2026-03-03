@@ -124,6 +124,7 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
   - `BRIDGE_SKIP_DONE=true|false`
   - `BRIDGE_ALLOWED_BUCKET_IDS=40,41`
   - `BRIDGE_REQUIRED_LABELS=size/s,size/m`
+- optional multi-project polling via `BRIDGE_PROJECT_IDS=13,14`
 - `[bind]...[/bind]` parsing (`node`, `session`, `workdir`)
 - idempotent state watermark (`last_processed_comment_id`)
 - bridge comment prefix protection (`[bridge]`)
@@ -275,6 +276,9 @@ Bridge worker run options:
 # One-shot local cycle
 BRIDGE_PROJECT_ID=13 BRIDGE_DRY_RUN=1 make bridge-once
 
+# One-shot cycle for multiple projects
+BRIDGE_PROJECT_IDS=13,14 BRIDGE_DRY_RUN=1 make bridge-once
+
 # Continuous bridge worker via compose profile
 docker compose --profile bridge up -d --build bridge-worker
 
@@ -287,6 +291,9 @@ BRIDGE_BACKOFF_MIN_SECONDS=5 BRIDGE_BACKOFF_MAX_SECONDS=120 BRIDGE_PENDING_COMME
 # Direct python invocation (export .env first)
 set -a; source .env; set +a
 PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker --project-id 13 --once
+
+# Direct python invocation for multiple projects
+PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker --project-ids 13,14 --once
 ```
 
 Queue notification example (host-side worker):
@@ -346,6 +353,7 @@ Main variables in `.env.example`:
 - `VIKUNJA_API_TOKEN`
 - `MCP_URL` (optional, default `http://localhost:8000/mcp`)
 - `BRIDGE_PROJECT_ID`
+- `BRIDGE_PROJECT_IDS` (optional comma-separated project IDs; polled together with `BRIDGE_PROJECT_ID` if both are set)
 - `BRIDGE_POLL_INTERVAL`
 - `BRIDGE_STATE_FILE`
 - `BRIDGE_CONFIRM_TTL_HOURS`
