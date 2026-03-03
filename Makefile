@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help onboard up bootstrap verify test-mcp test-bridge bridge-once monitor monitor-full backup-drill full-check publish-check logs ps down clean
+.PHONY: help onboard up bootstrap verify test-mcp test-bridge test-api bridge-once monitor monitor-full backup-drill full-check publish-check logs ps down clean
 
 help:
 	@echo "Available targets:"
@@ -10,6 +10,7 @@ help:
 	@echo "  make verify     - Run Vikunja workflow verification"
 	@echo "  make test-mcp   - Run MCP streamable-http smoke test"
 	@echo "  make test-bridge - Run bridge worker parser/unit checks"
+	@echo "  make test-api   - Run Vikunja API helper unit checks"
 	@echo "  make bridge-once - Run one bridge poll cycle (set BRIDGE_PROJECT_ID, optional BRIDGE_DRY_RUN=1)"
 	@echo "  make monitor    - Quick local stack health checks"
 	@echo "  make monitor-full - Health checks + verify/test-mcp smoke"
@@ -39,6 +40,9 @@ test-mcp:
 
 test-bridge:
 	python3 scripts/test_bridge_worker.py
+
+test-api:
+	python3 scripts/test_vikunja_api.py
 
 bridge-once:
 	@set -a; \

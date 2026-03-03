@@ -90,6 +90,7 @@ Runtime services:
 - [Task 45 Offline/Sleep Behavior Matrix](./docs/todo/task-45-offline-sleep-behavior-matrix.md)
 - [Task 46 Monitoring and Alerting Baseline](./docs/todo/task-46-monitoring-alerting-baseline.md)
 - [Task 47 Backup/Restore Drill Protocol](./docs/todo/task-47-backup-restore-drill-protocol.md)
+- [Task 64 Markdown Comment Rendering](./docs/todo/task-64-markdown-comment-rendering.md)
 
 ## Features
 
@@ -227,6 +228,7 @@ Validation:
 - `make verify` (Vikunja workflow validation)
 - `make test-mcp` (MCP protocol + tool-call validation)
 - `make test-bridge` (bridge parser/unit checks)
+- `make test-api` (Vikunja API helper unit checks)
 - `make bridge-once` (one bridge poll cycle, optional `BRIDGE_DRY_RUN=1`)
 - `make monitor` (quick health checks: compose + API + MCP port)
 - `make monitor-full` (monitor + verify + test-mcp smoke)

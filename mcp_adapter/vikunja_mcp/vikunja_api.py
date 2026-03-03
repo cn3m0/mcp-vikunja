@@ -191,8 +191,32 @@ class VikunjaClient:
             raise VikunjaApiError("Unexpected response type while listing task comments", details=payload)
         return payload
 
+    @staticmethod
+    def normalize_comment_text(comment: str) -> str:
+        # Keep explicit newlines and normalize line endings.
+        text = (comment or "").replace("\r\n", "\n").replace("\r", "\n")
+
+        # Common MCP/client issue: escaped newline sequences arrive as literal `\n`.
+        # Decode conservatively only for markdown-like payloads to avoid false positives
+        # (for example Windows paths like `C:\new\node`).
+        markdown_escaped_hints = (
+            "\\n\\n",
+            "\\n- ",
+            "\\n* ",
+            "\\n# ",
+            "\\n> ",
+            "\\n```",
+            "\\n1. ",
+            "\\n2. ",
+            "\\n3. ",
+        )
+        should_decode_escaped_newlines = "\\r\\n" in text or any(hint in text for hint in markdown_escaped_hints)
+        if "\n" not in text and should_decode_escaped_newlines:
+            text = text.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
+        return text
+
     def add_task_comment(self, task_id: int, comment: str) -> dict[str, Any]:
-        body = {"comment": comment}
+        body = {"comment": self.normalize_comment_text(comment)}
         payload = self._request(
             "PUT",
             f"/tasks/{task_id}/comments",
