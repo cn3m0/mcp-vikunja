@@ -130,6 +130,13 @@ def add_task_comment(task_id: int, comment: str) -> dict[str, Any]:
 
 
 @mcp.tool()
+def update_task(task_id: int, updates: dict[str, Any]) -> dict[str, Any]:
+    """Update fields on an existing task."""
+
+    return _run("update_task", lambda: _client().update_task(task_id=task_id, updates=updates))
+
+
+@mcp.tool()
 def move_task(
     task_id: int,
     target_bucket_id: int,

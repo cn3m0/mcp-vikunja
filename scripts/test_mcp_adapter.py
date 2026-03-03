@@ -166,6 +166,7 @@ def main() -> int:
             "create_task",
             "list_task_comments",
             "add_task_comment",
+            "update_task",
             "move_task",
         }
         missing = sorted(expected.difference(tools))

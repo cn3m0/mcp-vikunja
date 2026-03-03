@@ -21,11 +21,19 @@ def assert_equal(actual, expected, message: str) -> None:
 class FakeVikunjaClient(VikunjaClient):
     def __init__(self) -> None:
         super().__init__(base_url="http://localhost:3456/api/v1", token="dummy")
+        self.last_method: str | None = None
+        self.last_path: str | None = None
         self.last_json: dict | None = None
 
     def _request(self, method: str, path: str, *, auth: bool = True, params=None, json_data=None):  # type: ignore[override]
+        self.last_method = method
+        self.last_path = path
         self.last_json = json_data
-        return {"id": 1, "comment": (json_data or {}).get("comment", "")}
+        if path.endswith("/comments"):
+            return {"id": 1, "comment": (json_data or {}).get("comment", "")}
+        if path.startswith("/tasks/") and method == "POST":
+            return {"id": int(path.split("/")[2]), **(json_data or {})}
+        return {"id": 1}
 
 
 def main() -> int:
@@ -75,6 +83,17 @@ def main() -> int:
         "<p>Update:\n- bullet 1\n- bullet 2</p>",
         "request payload comment rendering failed",
     )
+    assert_equal(fake.last_method, "PUT", "add_task_comment should use PUT")
+    assert_equal(fake.last_path, "/tasks/64/comments", "add_task_comment path mismatch")
+
+    # update_task should pass payload as-is to /tasks/{id}
+    updates = {"title": "Updated title", "done": True}
+    updated = fake.update_task(task_id=64, updates=updates)
+    assert_equal(fake.last_method, "POST", "update_task should use POST")
+    assert_equal(fake.last_path, "/tasks/64", "update_task path mismatch")
+    assert_equal(fake.last_json, updates, "update_task payload mismatch")
+    assert_equal(updated.get("title"), "Updated title", "update_task response mismatch")
+    assert_equal(updated.get("done"), True, "update_task response mismatch")
 
     print("[OK] vikunja api checks passed")
     return 0

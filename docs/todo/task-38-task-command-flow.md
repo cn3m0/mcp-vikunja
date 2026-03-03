@@ -17,6 +17,7 @@ Goal:
 
 2. Write phase
 - `create_task` for new work item.
+- `update_task` for direct field changes (title, description, done/date fields, priority).
 - `add_task_comment` for status and execution logs.
 - `move_task` for lifecycle transitions.
 

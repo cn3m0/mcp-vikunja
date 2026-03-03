@@ -231,6 +231,7 @@ If session binding invalid/missing:
 - Added optional webhook trigger service (`bridge_webhook`) that updates `BRIDGE_TRIGGER_FILE` to wake the pull worker immediately.
 - Added webhook allowlist filters (`BRIDGE_WEBHOOK_ALLOWED_EVENTS`, `BRIDGE_WEBHOOK_ALLOWED_PROJECT_IDS`) plus strict project-match option.
 - Added optional auto-bucket transitions for queued command comments (`ack`, `done`, `blocked`) via `BRIDGE_AUTO_MOVE_*_BUCKET_ID`.
+- Exposed direct task field updates through MCP tool `update_task` (faster workflow edits from agent sessions).
 
 ## Open Questions
 

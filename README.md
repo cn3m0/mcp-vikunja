@@ -103,6 +103,7 @@ Runtime services:
 - `create_task`
 - `list_task_comments`
 - `add_task_comment`
+- `update_task`
 - `move_task`
 
 ### Design principles
