@@ -4,6 +4,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,7 @@ from vikunja_mcp.bridge_worker import (  # noqa: E402
     parse_bind_block,
     parse_command,
     parse_confirmation_token,
+    render_notify_command,
     task_mode,
 )
 
@@ -88,6 +90,11 @@ def main() -> int:
     # parse_allowed_users + comment_author_username
     assert_equal(parse_allowed_users("admin, OpsBot"), {"admin", "opsbot"}, "allowed users parse failed")
     assert_equal(parse_allowed_users(""), None, "empty allowlist should disable restriction")
+    rendered_notify = render_notify_command(
+        "echo {task_id}:{command}:{session}",
+        {"task_id": "5", "command": "ack", "session": "codex-a"},
+    )
+    assert_equal(rendered_notify, "echo 5:ack:codex-a", "notify command rendering failed")
     assert_equal(
         comment_author_username({"author": {"username": "Admin"}}),
         "admin",
@@ -145,6 +152,36 @@ def main() -> int:
     assert_equal(fake_blocked.updates, [], "blocked action should not update task")
     assert_equal(fake_blocked.moves, [], "blocked action should not move task")
     assert_equal(any("author not allowed" in c[1] for c in fake_blocked.comments), True, "block reason missing")
+
+    # queue command should write work-order and run notification command
+    notify_file = Path(tempfile.gettempdir()) / "bridge-notify-test.txt"
+    notify_file.unlink(missing_ok=True)
+
+    fake_queue = FakeClient()
+    worker_queue = BridgeWorker(
+        client=fake_queue,  # type: ignore[arg-type]
+        project_id=13,
+        state_path=Path("/tmp/test-bridge-worker-state-queue.json"),
+        dry_run=False,
+        notify_command=f"printf '{{task_id}}:{{command}}:{{comment_id}}' > {notify_file}",
+        notify_timeout_seconds=5,
+    )
+    with tempfile.TemporaryDirectory(prefix="bridge-queue-test-") as tmpdir:
+        worker_queue._handle_queue_command(
+            task={"id": 125, "project_id": 13, "title": "Queue Demo"},
+            comment_id=77,
+            command_name="update",
+            command_body="check notify path",
+            binding={"node": "np1", "session": "s", "workdir": tmpdir},
+        )
+        inbox_file = Path(tmpdir) / "inbox" / "task-125-comment-77.md"
+        assert_equal(inbox_file.exists(), True, "queue command should create work-order file")
+        payload = inbox_file.read_text(encoding="utf-8")
+        assert_equal("check notify path" in payload, True, "work-order body missing")
+
+    assert_equal(notify_file.exists(), True, "notify file should be created")
+    assert_equal(notify_file.read_text(encoding="utf-8"), "125:update:77", "notify command output mismatch")
+    notify_file.unlink(missing_ok=True)
 
     print("[OK] bridge worker unit checks passed")
     return 0

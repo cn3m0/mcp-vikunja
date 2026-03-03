@@ -214,10 +214,17 @@ If session binding invalid/missing:
 - `mode/human` tasks are never executed by bridge logic.
 - Invalid binding leads to deterministic `blocked` feedback.
 
+## Implementation Updates (2026-03-03)
+
+- Implemented pull-based bridge worker with persistent state watermark.
+- Implemented `mode/ai` gate and bind parsing.
+- Implemented level-2 action confirmation policy (`move`, `reopen`) with TTL and one-time token semantics.
+- Added optional confirmation author allowlist (`BRIDGE_CONFIRM_ALLOWED_USERS`).
+- Added optional queue notification hook (`BRIDGE_NOTIFY_COMMAND`) for tmux/ntfy/local operator alerts when new work-order files are created.
+
 ## Open Questions
 
 - Exact project selection strategy (single project vs multi-project list)?
 - Should ownership mode allow task-level override comments?
 - Required SLA for poll interval (e.g. 5s, 15s, 30s)?
 - Should `size/L` auto-force `mode/human` unless explicitly overridden?
-

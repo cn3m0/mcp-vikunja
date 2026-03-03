@@ -127,6 +127,7 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
   - `action: move bucket=<id> id=<action-id>`
   - `action: reopen bucket=<id> id=<action-id>`
   - optional confirmer allowlist via `BRIDGE_CONFIRM_ALLOWED_USERS`
+- optional queue notification hook via `BRIDGE_NOTIFY_COMMAND`
 
 ## Prerequisites
 
@@ -262,6 +263,18 @@ set -a; source .env; set +a
 PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker --project-id 13 --once
 ```
 
+Queue notification example (host-side worker):
+
+```bash
+export BRIDGE_NOTIFY_COMMAND='tmux display-message -t {session} "bridge task={task_id} cmd={command} file={file}"'
+export BRIDGE_NOTIFY_TIMEOUT_SECONDS=8
+BRIDGE_PROJECT_ID=13 make bridge-once
+```
+
+Note:
+- `BRIDGE_NOTIFY_COMMAND` runs as a shell command in the worker runtime context.
+- If worker runs in Docker, host `tmux` is usually not reachable from container runtime.
+
 Action command example:
 
 ```text
@@ -300,6 +313,8 @@ Main variables in `.env.example`:
 - `BRIDGE_STATE_FILE`
 - `BRIDGE_CONFIRM_TTL_HOURS`
 - `BRIDGE_CONFIRM_ALLOWED_USERS` (comma-separated usernames, optional)
+- `BRIDGE_NOTIFY_COMMAND` (optional shell command for queue notifications)
+- `BRIDGE_NOTIFY_TIMEOUT_SECONDS`
 
 ## Security
 
