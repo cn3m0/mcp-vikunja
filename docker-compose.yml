@@ -79,6 +79,7 @@ services:
       VIKUNJA_TIMEOUT: "15"
       BRIDGE_POLL_INTERVAL: ${BRIDGE_POLL_INTERVAL:-15}
       BRIDGE_CONFIRM_TTL_HOURS: ${BRIDGE_CONFIRM_TTL_HOURS:-24}
+      BRIDGE_CONFIRM_ALLOWED_USERS: ${BRIDGE_CONFIRM_ALLOWED_USERS:-}
       LOG_LEVEL: INFO
     command:
       [
@@ -93,6 +94,8 @@ services:
         "${BRIDGE_POLL_INTERVAL:-15}",
         "--confirm-ttl-hours",
         "${BRIDGE_CONFIRM_TTL_HOURS:-24}",
+        "--confirm-allowed-users",
+        "${BRIDGE_CONFIRM_ALLOWED_USERS:-}",
       ]
     volumes:
       - bridge_state:/var/lib/vikunja-bridge

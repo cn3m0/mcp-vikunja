@@ -125,6 +125,8 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
 - level-2 action policy with explicit confirmations:
   - `confirm: <action-id>`
   - `action: move bucket=<id> id=<action-id>`
+  - `action: reopen bucket=<id> id=<action-id>`
+  - optional confirmer allowlist via `BRIDGE_CONFIRM_ALLOWED_USERS`
 
 ## Prerequisites
 
@@ -246,12 +248,16 @@ Action command example:
 ```text
 confirm: move-to-doing-001
 action: move bucket=40 id=move-to-doing-001
+
+confirm: reopen-task-001
+action: reopen bucket=39 id=reopen-task-001
 ```
 
 The action is executed only if:
 - task is labeled `mode/ai`
 - valid `[bind]` block exists
 - confirmation token exists, is unexpired, and unused
+- optional confirmer allowlist check passes (`BRIDGE_CONFIRM_ALLOWED_USERS`)
 
 ## Environment Variables
 
@@ -273,6 +279,7 @@ Main variables in `.env.example`:
 - `BRIDGE_POLL_INTERVAL`
 - `BRIDGE_STATE_FILE`
 - `BRIDGE_CONFIRM_TTL_HOURS`
+- `BRIDGE_CONFIRM_ALLOWED_USERS` (comma-separated usernames, optional)
 
 ## Security
 

@@ -90,6 +90,23 @@ def parse_bind_block(text: str) -> dict[str, str] | None:
     return {k: data[k] for k in ("node", "session", "workdir")}
 
 
+def parse_allowed_users(raw: str | None) -> set[str] | None:
+    if raw is None:
+        return None
+    values = {part.strip().lower() for part in raw.split(",") if part.strip()}
+    if not values:
+        return None
+    return values
+
+
+def comment_author_username(comment: dict[str, Any]) -> str | None:
+    author = comment.get("author") if isinstance(comment, dict) else None
+    if not isinstance(author, dict):
+        return None
+    username = str(author.get("username", "")).strip()
+    return username.lower() if username else None
+
+
 def task_mode(task: dict[str, Any]) -> str:
     labels = task.get("labels") or []
     titles = {str(label.get("title", "")).lower() for label in labels if isinstance(label, dict)}
@@ -161,12 +178,14 @@ class BridgeWorker:
         state_path: Path,
         dry_run: bool = False,
         confirm_ttl_hours: int = 24,
+        confirm_allowed_users: set[str] | None = None,
     ) -> None:
         self.client = client
         self.project_id = project_id
         self.state = BridgeState(state_path)
         self.dry_run = dry_run
         self.confirm_ttl = timedelta(hours=max(confirm_ttl_hours, 1))
+        self.confirm_allowed_users = confirm_allowed_users
 
     def run_once(self) -> None:
         tasks = self.client.list_tasks(project_id=self.project_id, page=1, per_page=300)
@@ -188,17 +207,18 @@ class BridgeWorker:
 
         task_state = self.state.get_task_state(task_id)
         binding: dict[str, str] | None = None
-        confirmations: dict[str, tuple[int, datetime]] = {}
+        confirmations: dict[str, tuple[int, datetime, str | None]] = {}
         used_confirmations = task_state.used_confirmations or set()
 
         for comment in comments:
             comment_id = int(comment.get("id", 0))
             text = normalize_text(str(comment.get("comment", "")))
             created_at = self._parse_comment_created(comment.get("created"))
+            author_username = comment_author_username(comment)
 
             token = parse_confirmation_token(text)
             if token and created_at:
-                confirmations[token] = (comment_id, created_at)
+                confirmations[token] = (comment_id, created_at, author_username)
 
             if comment_id <= task_state.last_processed_comment_id:
                 bind = parse_bind_block(text)
@@ -308,7 +328,7 @@ class BridgeWorker:
         comment_id: int,
         action_cmd: ActionCommand,
         binding: dict[str, str] | None,
-        confirmations: dict[str, tuple[int, datetime]],
+        confirmations: dict[str, tuple[int, datetime, str | None]],
         used_confirmations: set[str],
     ) -> None:
         task_id = int(task["id"])
@@ -328,7 +348,7 @@ class BridgeWorker:
             )
             return
 
-        confirm_comment_id, confirm_created = token
+        confirm_comment_id, confirm_created, confirm_author = token
         if confirm_comment_id >= comment_id:
             self._post_bridge_comment(
                 task_id,
@@ -343,13 +363,29 @@ class BridgeWorker:
             )
             return
 
+        if self.confirm_allowed_users and (not confirm_author or confirm_author not in self.confirm_allowed_users):
+            allowed = ", ".join(sorted(self.confirm_allowed_users))
+            self._post_bridge_comment(
+                task_id,
+                "blocked: confirmation author not allowed "
+                f"(action_id={action_cmd.action_id} author={confirm_author or 'unknown'} allowed={allowed})",
+            )
+            return
+
         project_id = int(task.get("project_id", self.project_id))
         try:
-            self.client.move_task(
-                task_id=task_id,
-                target_bucket_id=action_cmd.bucket_id,
-                project_id=project_id,
-            )
+            if self.dry_run:
+                self._post_bridge_comment(
+                    task_id,
+                    "ack: dry-run action="
+                    f"{action_cmd.action} bucket={action_cmd.bucket_id} action_id={action_cmd.action_id}",
+                )
+                return
+
+            if action_cmd.action == "reopen":
+                self.client.update_task(task_id=task_id, updates={"done": False})
+
+            self.client.move_task(task_id=task_id, target_bucket_id=action_cmd.bucket_id, project_id=project_id)
             used_confirmations.add(action_cmd.action_id)
             self._post_bridge_comment(
                 task_id,
@@ -432,6 +468,11 @@ def parse_args() -> argparse.Namespace:
         default=int(os.getenv("BRIDGE_CONFIRM_TTL_HOURS", "24")),
         help="How long confirmation tokens remain valid",
     )
+    parser.add_argument(
+        "--confirm-allowed-users",
+        default=os.getenv("BRIDGE_CONFIRM_ALLOWED_USERS", ""),
+        help="Comma-separated usernames allowed to authorize `confirm:` tokens (empty = no restriction)",
+    )
     parser.add_argument("--once", action="store_true", help="Run one poll cycle and exit")
     parser.add_argument("--dry-run", action="store_true", help="Do not write files or comments")
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
@@ -453,6 +494,7 @@ def main() -> int:
             state_path=Path(args.state_file),
             dry_run=args.dry_run,
             confirm_ttl_hours=args.confirm_ttl_hours,
+            confirm_allowed_users=parse_allowed_users(args.confirm_allowed_users),
         )
         if args.once:
             worker.run_once()

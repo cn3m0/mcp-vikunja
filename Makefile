@@ -48,6 +48,7 @@ bridge-once:
 	  --project-id "$$PROJECT_ID" \
 	  --state-file "$${BRIDGE_STATE_FILE:-/tmp/mcp-vikunja-bridge/state.json}" \
 	  --confirm-ttl-hours "$${BRIDGE_CONFIRM_TTL_HOURS:-24}" \
+	  --confirm-allowed-users "$${BRIDGE_CONFIRM_ALLOWED_USERS:-}" \
 	  --once $$EXTRA
 
 full-check: verify test-mcp
