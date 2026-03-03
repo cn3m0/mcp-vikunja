@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: help onboard up bootstrap verify test-mcp test-bridge test-api bridge-once monitor monitor-full backup-drill full-check publish-check logs ps down clean
+.PHONY: help onboard up bootstrap verify test-mcp test-bridge test-api bridge-once monitor monitor-full watchdog-once watchdog-loop backup-drill full-check publish-check logs ps down clean
 
 help:
 	@echo "Available targets:"
@@ -14,6 +14,8 @@ help:
 	@echo "  make bridge-once - Run one bridge poll cycle (set BRIDGE_PROJECT_ID, optional BRIDGE_DRY_RUN=1)"
 	@echo "  make monitor    - Quick local stack health checks"
 	@echo "  make monitor-full - Health checks + verify/test-mcp smoke"
+	@echo "  make watchdog-once - Run one watchdog cycle and write status json"
+	@echo "  make watchdog-loop - Continuous watchdog loop"
 	@echo "  make backup-drill - Create SQL backup and run restore drill"
 	@echo "  make full-check - Run verify and MCP smoke test"
 	@echo "  make publish-check - Run static checks for GitHub publishing"
@@ -66,6 +68,12 @@ monitor:
 
 monitor-full:
 	python3 scripts/monitor_stack.py --full
+
+watchdog-once:
+	python3 scripts/watchdog_loop.py --once
+
+watchdog-loop:
+	python3 scripts/watchdog_loop.py
 
 backup-drill:
 	python3 scripts/backup_restore_drill.py
