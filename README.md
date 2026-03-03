@@ -134,6 +134,8 @@ Implemented as `python -m vikunja_mcp.bridge_worker`:
   - `action: reopen bucket=<id> id=<action-id>`
   - optional confirmer allowlist via `BRIDGE_CONFIRM_ALLOWED_USERS`
 - optional queue notification hook via `BRIDGE_NOTIFY_COMMAND`
+- failed bridge comments are queued locally and retried (`BRIDGE_PENDING_COMMENTS_FILE`)
+- failed poll cycles use exponential backoff (`BRIDGE_BACKOFF_MIN_SECONDS` / `BRIDGE_BACKOFF_MAX_SECONDS`)
 
 ## Prerequisites
 
@@ -279,6 +281,9 @@ docker compose --profile bridge up -d --build bridge-worker
 # Restrict processing to active execution buckets + size labels
 BRIDGE_PROJECT_ID=13 BRIDGE_ALLOWED_BUCKET_IDS=40,41 BRIDGE_REQUIRED_LABELS=size/s,size/m make bridge-once
 
+# Continuous worker retry tuning + pending-comment spool path
+BRIDGE_BACKOFF_MIN_SECONDS=5 BRIDGE_BACKOFF_MAX_SECONDS=120 BRIDGE_PENDING_COMMENTS_FILE=/var/lib/vikunja-bridge/pending-comments.jsonl docker compose --profile bridge up -d --build bridge-worker
+
 # Direct python invocation (export .env first)
 set -a; source .env; set +a
 PYTHONPATH=./mcp_adapter python3 -m vikunja_mcp.bridge_worker --project-id 13 --once
@@ -351,6 +356,10 @@ Main variables in `.env.example`:
 - `BRIDGE_SKIP_DONE` (default `true`, skip tasks where `done=true`)
 - `BRIDGE_ALLOWED_BUCKET_IDS` (optional comma-separated bucket IDs to include)
 - `BRIDGE_REQUIRED_LABELS` (optional comma-separated labels, at least one must match)
+- `BRIDGE_PENDING_COMMENTS_FILE` (optional JSONL spool for bridge comments that could not be posted)
+- `BRIDGE_PENDING_COMMENTS_MAX` (max retained queued bridge comments, default `500`)
+- `BRIDGE_BACKOFF_MIN_SECONDS` (retry backoff min delay for failed poll cycles)
+- `BRIDGE_BACKOFF_MAX_SECONDS` (retry backoff max delay for failed poll cycles)
 
 ## Security
 

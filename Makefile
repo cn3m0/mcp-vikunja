@@ -63,6 +63,8 @@ bridge-once:
 	  --mode-file "$${BRIDGE_MODE_FILE:-}" \
 	  --allowed-bucket-ids "$${BRIDGE_ALLOWED_BUCKET_IDS:-}" \
 	  --required-labels "$${BRIDGE_REQUIRED_LABELS:-}" \
+	  --pending-comments-file "$${BRIDGE_PENDING_COMMENTS_FILE:-}" \
+	  --pending-comments-max "$${BRIDGE_PENDING_COMMENTS_MAX:-500}" \
 	  --once $$EXTRA
 
 monitor:

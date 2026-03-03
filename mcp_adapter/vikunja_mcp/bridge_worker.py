@@ -134,6 +134,16 @@ def parse_bool(raw: str | None, default: bool = False) -> bool:
     return default
 
 
+def compute_backoff_seconds(consecutive_failures: int, min_seconds: int, max_seconds: int) -> int:
+    min_delay = max(int(min_seconds), 1)
+    max_delay = max(int(max_seconds), min_delay)
+    failures = max(int(consecutive_failures), 0)
+    if failures <= 0:
+        return min_delay
+    delay = min_delay * (2 ** (failures - 1))
+    return min(delay, max_delay)
+
+
 def render_notify_command(template: str, values: dict[str, str]) -> str:
     rendered = template
     for key, value in values.items():
@@ -301,6 +311,8 @@ class BridgeWorker:
         skip_done: bool = True,
         allowed_bucket_ids: set[int] | None = None,
         required_labels: set[str] | None = None,
+        pending_comments_path: Path | None = None,
+        pending_comments_max: int = 500,
     ) -> None:
         self.client = client
         self.project_id = project_id
@@ -314,9 +326,14 @@ class BridgeWorker:
         self.skip_done = skip_done
         self.allowed_bucket_ids = allowed_bucket_ids
         self.required_labels = required_labels
+        if pending_comments_path is None:
+            pending_comments_path = state_path.parent / "pending-bridge-comments.jsonl"
+        self.pending_comments_path = pending_comments_path
+        self.pending_comments_max = max(int(pending_comments_max), 1)
 
     def run_once(self) -> None:
         tasks = self.client.list_tasks(project_id=self.project_id, page=1, per_page=300)
+        self._flush_pending_bridge_comments(limit=50)
         fallback_mode = read_mode_file(self.mode_file_path)
         if self.mode_file_path and fallback_mode:
             LOGGER.info("Bridge mode fallback from file %s => %s", self.mode_file_path, fallback_mode)
@@ -616,7 +633,101 @@ class BridgeWorker:
         if self.dry_run:
             LOGGER.info("Dry-run: comment task#%s: %s", task_id, content)
             return
-        self.client.add_task_comment(task_id=task_id, comment=content)
+        try:
+            self.client.add_task_comment(task_id=task_id, comment=content)
+        except Exception as exc:
+            LOGGER.warning("Could not post bridge comment task#%s, queued for retry: %s", task_id, exc)
+            self._append_pending_bridge_comment(task_id=task_id, content=content, error=exc)
+
+    def _read_pending_bridge_comments(self) -> list[dict[str, Any]]:
+        path = self.pending_comments_path
+        if path is None or not path.exists():
+            return []
+        rows: list[dict[str, Any]] = []
+        try:
+            for line in path.read_text(encoding="utf-8").splitlines():
+                text = line.strip()
+                if not text:
+                    continue
+                try:
+                    payload = json.loads(text)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(payload, dict) and "task_id" in payload and "content" in payload:
+                    rows.append(payload)
+        except OSError:
+            return []
+        return rows
+
+    def _write_pending_bridge_comments(self, rows: list[dict[str, Any]]) -> None:
+        path = self.pending_comments_path
+        if path is None:
+            return
+        if not rows:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            return
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        body = "\n".join(json.dumps(item, separators=(",", ":")) for item in rows) + "\n"
+        tmp.write_text(body, encoding="utf-8")
+        tmp.replace(path)
+
+    def _append_pending_bridge_comment(self, *, task_id: int, content: str, error: Exception) -> None:
+        if self.dry_run:
+            return
+        rows = self._read_pending_bridge_comments()
+        rows.append(
+            {
+                "task_id": int(task_id),
+                "content": content,
+                "attempts": 1,
+                "created_at": _now_iso(),
+                "updated_at": _now_iso(),
+                "last_error": self._one_line(error),
+            }
+        )
+        if len(rows) > self.pending_comments_max:
+            rows = rows[-self.pending_comments_max :]
+        self._write_pending_bridge_comments(rows)
+
+    def _flush_pending_bridge_comments(self, *, limit: int = 50) -> None:
+        if self.dry_run:
+            return
+        rows = self._read_pending_bridge_comments()
+        if not rows:
+            return
+
+        kept: list[dict[str, Any]] = []
+        sent = 0
+        flush_limit = max(int(limit), 1)
+        for row in rows:
+            if sent >= flush_limit:
+                kept.append(row)
+                continue
+            try:
+                task_id = int(row.get("task_id", 0))
+                content = str(row.get("content", "")).strip()
+                if not task_id or not content:
+                    continue
+                self.client.add_task_comment(task_id=task_id, comment=content)
+                sent += 1
+            except Exception as exc:
+                row["attempts"] = int(row.get("attempts", 0)) + 1
+                row["updated_at"] = _now_iso()
+                row["last_error"] = self._one_line(exc)
+                kept.append(row)
+
+        self._write_pending_bridge_comments(kept)
+        if sent or len(kept) != len(rows):
+            LOGGER.info(
+                "Pending bridge comments flush: sent=%d remaining=%d",
+                sent,
+                len(kept),
+            )
 
     @staticmethod
     def _one_line(value: Any) -> str:
@@ -728,6 +839,29 @@ def parse_args() -> argparse.Namespace:
         default=os.getenv("BRIDGE_REQUIRED_LABELS", ""),
         help="Optional comma-separated labels required for processing",
     )
+    parser.add_argument(
+        "--pending-comments-file",
+        default=os.getenv("BRIDGE_PENDING_COMMENTS_FILE", ""),
+        help="Optional JSONL file for bridge comments that failed to post",
+    )
+    parser.add_argument(
+        "--pending-comments-max",
+        type=int,
+        default=int(os.getenv("BRIDGE_PENDING_COMMENTS_MAX", "500")),
+        help="Maximum queued pending bridge comments retained locally",
+    )
+    parser.add_argument(
+        "--backoff-min-seconds",
+        type=int,
+        default=int(os.getenv("BRIDGE_BACKOFF_MIN_SECONDS", "5")),
+        help="Retry backoff minimum delay in seconds for failed cycles",
+    )
+    parser.add_argument(
+        "--backoff-max-seconds",
+        type=int,
+        default=int(os.getenv("BRIDGE_BACKOFF_MAX_SECONDS", "300")),
+        help="Retry backoff maximum delay in seconds for failed cycles",
+    )
     parser.add_argument("--once", action="store_true", help="Run one poll cycle and exit")
     parser.add_argument("--dry-run", action="store_true", help="Do not write files or comments")
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
@@ -756,18 +890,48 @@ def main() -> int:
             skip_done=bool(args.skip_done),
             allowed_bucket_ids=parse_int_set(args.allowed_bucket_ids),
             required_labels=parse_lower_set(args.required_labels),
+            pending_comments_path=Path(args.pending_comments_file).expanduser() if args.pending_comments_file else None,
+            pending_comments_max=args.pending_comments_max,
         )
         if args.once:
             worker.run_once()
             return 0
 
         LOGGER.info("Starting bridge worker (project_id=%s interval=%ss)", args.project_id, args.interval)
+        consecutive_failures = 0
         while True:
             try:
                 worker.run_once()
+                consecutive_failures = 0
+                time.sleep(max(args.interval, 1))
             except VikunjaApiError as exc:
-                LOGGER.warning("Bridge cycle failed: %s", exc)
-            time.sleep(max(args.interval, 1))
+                consecutive_failures += 1
+                delay = compute_backoff_seconds(
+                    consecutive_failures=consecutive_failures,
+                    min_seconds=args.backoff_min_seconds,
+                    max_seconds=args.backoff_max_seconds,
+                )
+                LOGGER.warning(
+                    "Bridge cycle failed (%d consecutive): %s; retry in %ss",
+                    consecutive_failures,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+            except Exception as exc:  # pragma: no cover - defensive runtime handling
+                consecutive_failures += 1
+                delay = compute_backoff_seconds(
+                    consecutive_failures=consecutive_failures,
+                    min_seconds=args.backoff_min_seconds,
+                    max_seconds=args.backoff_max_seconds,
+                )
+                LOGGER.exception(
+                    "Bridge cycle failed (%d consecutive): %s; retry in %ss",
+                    consecutive_failures,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
     except Exception as exc:  # pragma: no cover - defensive entrypoint
         LOGGER.exception("Fatal bridge worker error: %s", exc)
         return 1

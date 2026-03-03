@@ -86,6 +86,10 @@ services:
       BRIDGE_SKIP_DONE: ${BRIDGE_SKIP_DONE:-true}
       BRIDGE_ALLOWED_BUCKET_IDS: ${BRIDGE_ALLOWED_BUCKET_IDS:-}
       BRIDGE_REQUIRED_LABELS: ${BRIDGE_REQUIRED_LABELS:-}
+      BRIDGE_PENDING_COMMENTS_FILE: ${BRIDGE_PENDING_COMMENTS_FILE:-}
+      BRIDGE_PENDING_COMMENTS_MAX: ${BRIDGE_PENDING_COMMENTS_MAX:-500}
+      BRIDGE_BACKOFF_MIN_SECONDS: ${BRIDGE_BACKOFF_MIN_SECONDS:-5}
+      BRIDGE_BACKOFF_MAX_SECONDS: ${BRIDGE_BACKOFF_MAX_SECONDS:-300}
       LOG_LEVEL: INFO
     command:
       [
@@ -112,6 +116,14 @@ services:
         "${BRIDGE_ALLOWED_BUCKET_IDS:-}",
         "--required-labels",
         "${BRIDGE_REQUIRED_LABELS:-}",
+        "--pending-comments-file",
+        "${BRIDGE_PENDING_COMMENTS_FILE:-}",
+        "--pending-comments-max",
+        "${BRIDGE_PENDING_COMMENTS_MAX:-500}",
+        "--backoff-min-seconds",
+        "${BRIDGE_BACKOFF_MIN_SECONDS:-5}",
+        "--backoff-max-seconds",
+        "${BRIDGE_BACKOFF_MAX_SECONDS:-300}",
       ]
     volumes:
       - bridge_state:/var/lib/vikunja-bridge

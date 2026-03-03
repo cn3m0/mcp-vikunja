@@ -15,6 +15,7 @@ from vikunja_mcp.bridge_worker import (  # noqa: E402
     ActionCommand,
     BridgeWorker,
     comment_author_username,
+    compute_backoff_seconds,
     parse_action_command,
     parse_allowed_users,
     parse_bool,
@@ -54,6 +55,18 @@ class FakeClient:
     def add_task_comment(self, task_id: int, comment: str) -> dict:
         self.comments.append((task_id, comment))
         return {"id": len(self.comments), "task_id": task_id, "comment": comment}
+
+
+class FlakyCommentClient(FakeClient):
+    def __init__(self, failures_before_success: int) -> None:
+        super().__init__()
+        self.failures_remaining = failures_before_success
+
+    def add_task_comment(self, task_id: int, comment: str) -> dict:
+        if self.failures_remaining > 0:
+            self.failures_remaining -= 1
+            raise RuntimeError("simulated comment failure")
+        return super().add_task_comment(task_id=task_id, comment=comment)
 
 
 class FakeListTasksClient(VikunjaClient):
@@ -114,6 +127,10 @@ def main() -> int:
     assert_equal(parse_bool("yes"), True, "bool yes parse failed")
     assert_equal(parse_bool("0", default=True), False, "bool false parse failed")
     assert_equal(parse_bool("unknown", default=True), True, "bool default fallback failed")
+    assert_equal(compute_backoff_seconds(0, 5, 300), 5, "backoff at 0 failures should be min")
+    assert_equal(compute_backoff_seconds(1, 5, 300), 5, "backoff first failure should be min")
+    assert_equal(compute_backoff_seconds(2, 5, 300), 10, "backoff second failure should double")
+    assert_equal(compute_backoff_seconds(10, 5, 60), 60, "backoff should clamp to max")
     assert_equal(parse_allowed_users(""), None, "empty allowlist should disable restriction")
     assert_equal(parse_mode_value("mode=ai"), "ai", "mode parser should support key=value")
     assert_equal(parse_mode_value("human"), "human", "mode parser should support plain value")
@@ -257,6 +274,26 @@ def main() -> int:
     assert_equal(notify_file.exists(), True, "notify file should be created")
     assert_equal(notify_file.read_text(encoding="utf-8"), "125:update:77", "notify command output mismatch")
     notify_file.unlink(missing_ok=True)
+
+    # failed comment posting should spool and later flush pending comments
+    with tempfile.TemporaryDirectory(prefix="bridge-pending-comments-") as tmpdir:
+        state_file = Path(tmpdir) / "state.json"
+        pending_file = Path(tmpdir) / "pending-comments.jsonl"
+        flaky = FlakyCommentClient(failures_before_success=1)
+        worker_spool = BridgeWorker(
+            client=flaky,  # type: ignore[arg-type]
+            project_id=13,
+            state_path=state_file,
+            dry_run=False,
+            pending_comments_path=pending_file,
+            pending_comments_max=20,
+        )
+        worker_spool._post_bridge_comment(200, "ack: queued test")
+        assert_equal(len(flaky.comments), 0, "failed post should not be recorded as sent")
+        assert_equal(pending_file.exists(), True, "failed post should create pending comments spool")
+        worker_spool._flush_pending_bridge_comments(limit=10)
+        assert_equal(len(flaky.comments), 1, "flush should send previously queued comment")
+        assert_equal(pending_file.exists(), False, "pending spool should be removed after successful flush")
 
     # list_tasks should flatten bucket payload even if first bucket has no `tasks` key
     bucket_payload = [

@@ -223,6 +223,8 @@ If session binding invalid/missing:
 - Implemented level-2 action confirmation policy (`move`, `reopen`) with TTL and one-time token semantics.
 - Added optional confirmation author allowlist (`BRIDGE_CONFIRM_ALLOWED_USERS`).
 - Added optional queue notification hook (`BRIDGE_NOTIFY_COMMAND`) for tmux/ntfy/local operator alerts when new work-order files are created.
+- Added offline-safe bridge comment spool with replay (`BRIDGE_PENDING_COMMENTS_FILE`) so failed comment writes are retried later.
+- Added exponential retry backoff for failed poll cycles (`BRIDGE_BACKOFF_MIN_SECONDS`, `BRIDGE_BACKOFF_MAX_SECONDS`).
 
 ## Open Questions
 
