@@ -49,3 +49,15 @@ Recommended minimum:
 
 - Failures are detected without manual dashboard checking.
 - Recovery actions can be started within minutes.
+
+## Implementation Note (2026-03-03)
+
+- Added `scripts/monitor_stack.py` with:
+  - compose service status check (`db`, `vikunja`, `mcp-adapter`)
+  - Vikunja API `/api/v1/info` reachability check
+  - MCP adapter TCP reachability check
+  - optional `--full` smoke (`verify_poc.py` + `test_mcp_adapter.py`)
+  - optional failure alert command (`--alert-command`)
+- Added Make targets:
+  - `make monitor`
+  - `make monitor-full`
