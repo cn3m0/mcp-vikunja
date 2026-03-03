@@ -82,6 +82,7 @@ services:
       BRIDGE_CONFIRM_ALLOWED_USERS: ${BRIDGE_CONFIRM_ALLOWED_USERS:-}
       BRIDGE_NOTIFY_COMMAND: ${BRIDGE_NOTIFY_COMMAND:-}
       BRIDGE_NOTIFY_TIMEOUT_SECONDS: ${BRIDGE_NOTIFY_TIMEOUT_SECONDS:-8}
+      BRIDGE_MODE_FILE: ${BRIDGE_MODE_FILE:-}
       LOG_LEVEL: INFO
     command:
       [
@@ -102,6 +103,8 @@ services:
         "${BRIDGE_NOTIFY_COMMAND:-}",
         "--notify-timeout-seconds",
         "${BRIDGE_NOTIFY_TIMEOUT_SECONDS:-8}",
+        "--mode-file",
+        "${BRIDGE_MODE_FILE:-}",
       ]
     volumes:
       - bridge_state:/var/lib/vikunja-bridge

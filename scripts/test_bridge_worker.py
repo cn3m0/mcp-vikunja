@@ -20,9 +20,12 @@ from vikunja_mcp.bridge_worker import (  # noqa: E402
     parse_bind_block,
     parse_command,
     parse_confirmation_token,
+    parse_mode_value,
+    read_mode_file,
     render_notify_command,
     task_mode,
 )
+from vikunja_mcp.vikunja_api import VikunjaClient  # noqa: E402
 
 
 def assert_equal(actual, expected, message: str) -> None:
@@ -47,6 +50,18 @@ class FakeClient:
     def add_task_comment(self, task_id: int, comment: str) -> dict:
         self.comments.append((task_id, comment))
         return {"id": len(self.comments), "task_id": task_id, "comment": comment}
+
+
+class FakeListTasksClient(VikunjaClient):
+    def __init__(self, payload: list[dict]) -> None:
+        super().__init__(base_url="http://localhost:3456/api/v1", token="dummy")
+        self._payload = payload
+
+    def _request(self, method: str, path: str, *, auth: bool = True, params=None, json_data=None):  # type: ignore[override]
+        return self._payload
+
+    def resolve_view_id(self, project_id: int, preferred_kind: str = "kanban") -> int:  # noqa: ARG002
+        return 52
 
 
 def main() -> int:
@@ -90,6 +105,9 @@ def main() -> int:
     # parse_allowed_users + comment_author_username
     assert_equal(parse_allowed_users("admin, OpsBot"), {"admin", "opsbot"}, "allowed users parse failed")
     assert_equal(parse_allowed_users(""), None, "empty allowlist should disable restriction")
+    assert_equal(parse_mode_value("mode=ai"), "ai", "mode parser should support key=value")
+    assert_equal(parse_mode_value("human"), "human", "mode parser should support plain value")
+    assert_equal(parse_mode_value("mode=invalid"), None, "mode parser should reject invalid values")
     rendered_notify = render_notify_command(
         "echo {task_id}:{command}:{session}",
         {"task_id": "5", "command": "ack", "session": "codex-a"},
@@ -104,9 +122,20 @@ def main() -> int:
 
     # task_mode
     mode_ai = task_mode({"labels": [{"title": "mode/ai"}]})
+    mode_human_label = task_mode({"labels": [{"title": "mode/human"}]}, fallback_mode="ai")
+    mode_ai_fallback = task_mode({"labels": []}, fallback_mode="ai")
     mode_human = task_mode({"labels": [{"title": "other"}]})
     assert_equal(mode_ai, "ai", "mode/ai resolution failed")
+    assert_equal(mode_human_label, "human", "mode/human label must override fallback")
+    assert_equal(mode_ai_fallback, "ai", "fallback mode file should allow ai mode without label")
     assert_equal(mode_human, "human", "default mode should be human")
+
+    with tempfile.TemporaryDirectory(prefix="bridge-mode-file-") as tmpdir:
+        mode_file = Path(tmpdir) / ".bridge-mode"
+        mode_file.write_text("# comment\nmode=ai\n", encoding="utf-8")
+        assert_equal(read_mode_file(mode_file), "ai", "mode file read failed")
+        mode_file.write_text("mode=invalid\n", encoding="utf-8")
+        assert_equal(read_mode_file(mode_file), None, "invalid mode file should be ignored")
 
     # action execution: reopen should set done=false then move
     fake = FakeClient()
@@ -182,6 +211,17 @@ def main() -> int:
     assert_equal(notify_file.exists(), True, "notify file should be created")
     assert_equal(notify_file.read_text(encoding="utf-8"), "125:update:77", "notify command output mismatch")
     notify_file.unlink(missing_ok=True)
+
+    # list_tasks should flatten bucket payload even if first bucket has no `tasks` key
+    bucket_payload = [
+        {"id": 39, "title": "To-Do"},
+        {"id": 40, "title": "Doing", "tasks": [{"id": 101, "title": "Task A"}]},
+    ]
+    list_client = FakeListTasksClient(bucket_payload)
+    flattened = list_client.list_tasks(project_id=13, view_id=52)
+    assert_equal(len(flattened), 1, "list_tasks flattening failed for bucket payload")
+    assert_equal(flattened[0].get("id"), 101, "flattened task id mismatch")
+    assert_equal(flattened[0].get("bucket_id"), 40, "flattened task bucket mismatch")
 
     print("[OK] bridge worker unit checks passed")
     return 0

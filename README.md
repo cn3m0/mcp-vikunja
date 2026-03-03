@@ -117,7 +117,8 @@ Runtime services:
 Implemented as `python -m vikunja_mcp.bridge_worker`:
 
 - pull-based polling loop
-- `mode/ai` ownership gate
+- ownership gate via labels (`mode/ai`, `mode/human`)
+- optional ownership fallback via `BRIDGE_MODE_FILE` (`mode=ai|human`) when labels are missing
 - `[bind]...[/bind]` parsing (`node`, `session`, `workdir`)
 - idempotent state watermark (`last_processed_comment_id`)
 - bridge comment prefix protection (`[bridge]`)
@@ -271,9 +272,20 @@ export BRIDGE_NOTIFY_TIMEOUT_SECONDS=8
 BRIDGE_PROJECT_ID=13 make bridge-once
 ```
 
+Mode fallback file example:
+
+```bash
+cat > /tmp/bridge-mode.env <<'EOF'
+mode=ai
+EOF
+export BRIDGE_MODE_FILE=/tmp/bridge-mode.env
+BRIDGE_PROJECT_ID=13 make bridge-once
+```
+
 Note:
 - `BRIDGE_NOTIFY_COMMAND` runs as a shell command in the worker runtime context.
 - If worker runs in Docker, host `tmux` is usually not reachable from container runtime.
+- `BRIDGE_MODE_FILE` is project-wide fallback; keep it on `mode=human` unless you explicitly want AI mode without labels.
 
 Action command example:
 
@@ -286,7 +298,7 @@ action: reopen bucket=39 id=reopen-task-001
 ```
 
 The action is executed only if:
-- task is labeled `mode/ai`
+- task resolves to `ai` mode (`mode/ai` label or optional `BRIDGE_MODE_FILE` fallback)
 - valid `[bind]` block exists
 - confirmation token exists, is unexpired, and unused
 - optional confirmer allowlist check passes (`BRIDGE_CONFIRM_ALLOWED_USERS`)
@@ -315,6 +327,7 @@ Main variables in `.env.example`:
 - `BRIDGE_CONFIRM_ALLOWED_USERS` (comma-separated usernames, optional)
 - `BRIDGE_NOTIFY_COMMAND` (optional shell command for queue notifications)
 - `BRIDGE_NOTIFY_TIMEOUT_SECONDS`
+- `BRIDGE_MODE_FILE` (optional fallback mode file path)
 
 ## Security
 

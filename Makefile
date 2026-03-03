@@ -54,6 +54,7 @@ bridge-once:
 	  --confirm-allowed-users "$${BRIDGE_CONFIRM_ALLOWED_USERS:-}" \
 	  --notify-command "$${BRIDGE_NOTIFY_COMMAND:-}" \
 	  --notify-timeout-seconds "$${BRIDGE_NOTIFY_TIMEOUT_SECONDS:-8}" \
+	  --mode-file "$${BRIDGE_MODE_FILE:-}" \
 	  --once $$EXTRA
 
 monitor:

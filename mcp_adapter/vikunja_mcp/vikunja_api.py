@@ -146,10 +146,14 @@ class VikunjaClient:
         if not isinstance(payload, list):
             raise VikunjaApiError("Unexpected response type while listing tasks", details=payload)
 
-        # Kanban views return buckets with nested tasks. Non-kanban views return tasks directly.
-        if payload and isinstance(payload[0], dict) and "tasks" in payload[0]:
+        # Kanban views return buckets with nested tasks. Some empty buckets may omit the
+        # `tasks` field, so detect by scanning the full payload, not only first element.
+        has_bucket_shape = any(isinstance(item, dict) and "tasks" in item for item in payload)
+        if has_bucket_shape:
             tasks: list[dict[str, Any]] = []
             for bucket in payload:
+                if not isinstance(bucket, dict):
+                    continue
                 bucket_id = bucket.get("id")
                 for task in bucket.get("tasks", []):
                     if isinstance(task, dict):

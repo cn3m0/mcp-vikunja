@@ -115,10 +115,49 @@ def comment_author_username(comment: dict[str, Any]) -> str | None:
     return username.lower() if username else None
 
 
-def task_mode(task: dict[str, Any]) -> str:
+def parse_mode_value(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    text = raw.strip().lower()
+    if not text:
+        return None
+
+    # Accept either `mode=ai|human` or plain `ai|human`.
+    if "=" in text:
+        key, value = text.split("=", 1)
+        if key.strip() != "mode":
+            return None
+        text = value.strip()
+
+    if text in {"ai", "human"}:
+        return text
+    return None
+
+
+def read_mode_file(path: Path | None) -> str | None:
+    if path is None or not path.exists() or not path.is_file():
+        return None
+    try:
+        for raw_line in path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            mode = parse_mode_value(line)
+            if mode:
+                return mode
+    except OSError:
+        return None
+    return None
+
+
+def task_mode(task: dict[str, Any], fallback_mode: str | None = None) -> str:
     labels = task.get("labels") or []
     titles = {str(label.get("title", "")).lower() for label in labels if isinstance(label, dict)}
+    if "mode/human" in titles:
+        return "human"
     if "mode/ai" in titles:
+        return "ai"
+    if fallback_mode == "ai":
         return "ai"
     return "human"
 
@@ -189,6 +228,7 @@ class BridgeWorker:
         confirm_allowed_users: set[str] | None = None,
         notify_command: str = "",
         notify_timeout_seconds: int = 8,
+        mode_file_path: Path | None = None,
     ) -> None:
         self.client = client
         self.project_id = project_id
@@ -198,13 +238,17 @@ class BridgeWorker:
         self.confirm_allowed_users = confirm_allowed_users
         self.notify_command = notify_command.strip()
         self.notify_timeout_seconds = max(notify_timeout_seconds, 1)
+        self.mode_file_path = mode_file_path
 
     def run_once(self) -> None:
         tasks = self.client.list_tasks(project_id=self.project_id, page=1, per_page=300)
+        fallback_mode = read_mode_file(self.mode_file_path)
+        if self.mode_file_path and fallback_mode:
+            LOGGER.info("Bridge mode fallback from file %s => %s", self.mode_file_path, fallback_mode)
         LOGGER.info("Found %d tasks in project %s", len(tasks), self.project_id)
 
         for task in sorted(tasks, key=lambda t: int(t.get("id", 0))):
-            mode = task_mode(task)
+            mode = task_mode(task, fallback_mode=fallback_mode)
             if mode != "ai":
                 continue
             self._process_task(task)
@@ -558,6 +602,11 @@ def parse_args() -> argparse.Namespace:
         default=int(os.getenv("BRIDGE_NOTIFY_TIMEOUT_SECONDS", "8")),
         help="Timeout for notify shell command execution",
     )
+    parser.add_argument(
+        "--mode-file",
+        default=os.getenv("BRIDGE_MODE_FILE", ""),
+        help="Optional fallback mode file path (supports lines like `mode=ai` or `mode=human`)",
+    )
     parser.add_argument("--once", action="store_true", help="Run one poll cycle and exit")
     parser.add_argument("--dry-run", action="store_true", help="Do not write files or comments")
     parser.add_argument("--log-level", default=os.getenv("LOG_LEVEL", "INFO"))
@@ -582,6 +631,7 @@ def main() -> int:
             confirm_allowed_users=parse_allowed_users(args.confirm_allowed_users),
             notify_command=args.notify_command,
             notify_timeout_seconds=args.notify_timeout_seconds,
+            mode_file_path=Path(args.mode_file).expanduser() if args.mode_file else None,
         )
         if args.once:
             worker.run_once()

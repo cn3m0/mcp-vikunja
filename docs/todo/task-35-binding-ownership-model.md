@@ -44,6 +44,10 @@ Behavior:
 Fallback:
 - If mode label is absent, default to safe behavior (`mode/human`).
 
+Optional fallback file (project-level):
+- `BRIDGE_MODE_FILE` can provide `mode=ai` or `mode=human` when mode labels are absent.
+- Label precedence remains authoritative over file fallback.
+
 ## Safety Rules
 
 - Ignore machine-authored comments with prefix `[bridge]`.
@@ -63,3 +67,10 @@ Fallback:
 - Binding resolution is deterministic.
 - `mode/human` reliably prevents execution.
 - Duplicate poll cycles do not trigger duplicate work.
+
+## Implementation Note (2026-03-03)
+
+- Added optional mode fallback file support in bridge worker:
+  - env/cli: `BRIDGE_MODE_FILE` / `--mode-file`
+  - parser accepts `mode=ai|human` and plain `ai|human`
+  - labels remain authoritative (`mode/human` > `mode/ai` > file fallback > default human)
