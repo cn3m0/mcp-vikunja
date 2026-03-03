@@ -569,9 +569,10 @@ class BridgeWorker:
             )
 
             for task in sorted(tasks, key=lambda t: int(t.get("id", 0))):
-                comments = self.client.list_task_comments(task_id=int(task["id"]), order_by="asc")
+                comments: list[dict[str, Any]] | None = None
                 comment_override = None
                 if self.allow_mode_comment_override:
+                    comments = self.client.list_task_comments(task_id=int(task["id"]), order_by="asc")
                     comment_override = latest_mode_override_from_comments(comments)
                 mode = task_mode_with_override(task, fallback_mode=fallback_mode, comment_override=comment_override)
                 allowed, reason = should_process_task(
@@ -592,6 +593,8 @@ class BridgeWorker:
                         skipped_labels += 1
                     continue
                 selected += 1
+                if comments is None:
+                    comments = self.client.list_task_comments(task_id=int(task["id"]), order_by="asc")
                 self._process_task(task, comments=comments)
 
         LOGGER.info(

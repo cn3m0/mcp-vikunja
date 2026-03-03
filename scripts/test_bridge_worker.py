@@ -92,6 +92,7 @@ class FakeMultiProjectClient(FakeClient):
     def __init__(self) -> None:
         super().__init__()
         self.projects_listed: list[int] = []
+        self.comment_calls = 0
 
     def list_tasks(self, project_id: int, *, view_id: int | None = None, page: int = 1, per_page: int = 50) -> list[dict]:  # noqa: ARG002
         self.projects_listed.append(project_id)
@@ -108,6 +109,7 @@ class FakeMultiProjectClient(FakeClient):
         ]
 
     def list_task_comments(self, task_id: int, order_by: str = "asc") -> list[dict]:  # noqa: ARG002
+        self.comment_calls += 1
         return []
 
 
@@ -372,6 +374,7 @@ def main() -> int:
         )
         multi_worker.run_once()
         assert_equal(multi_client.projects_listed, [13, 14], "multi-project polling order mismatch")
+        assert_equal(multi_client.comment_calls, 0, "comments should not be fetched for skipped tasks when override is off")
 
     # per-project skip_done override should select done tasks only for configured projects
     with tempfile.TemporaryDirectory(prefix="bridge-project-filters-") as tmpdir:
@@ -390,6 +393,7 @@ def main() -> int:
         state_payload = multi_worker_filters.state._data.get("tasks", {})
         assert_equal("14001" in state_payload, True, "project-level skip_done override should allow project 14 task")
         assert_equal("13001" in state_payload, False, "project 13 should still skip done task")
+        assert_equal(multi_client_filters.comment_calls, 1, "comments should be fetched only for selected task")
 
     # list_tasks should flatten bucket payload even if first bucket has no `tasks` key
     bucket_payload = [
